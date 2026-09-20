@@ -155,6 +155,7 @@ def comment_to_api(
         "defaultValue2": comment.default_value2,
         "defaultLocation": comment.default_location,
         "defaultText": default_text,
+        "richTextHtml": comment.rich_text_html or comment.text,
         "defaultPhotos": [image_to_api(image) for image in (images or [])],
     }
 

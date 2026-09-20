@@ -58,6 +58,91 @@ def _plain_from_rich(value: Any) -> str:
     return text
 
 
+def _escape_html(text: str) -> str:
+    return (
+        (text or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _inline_html_from_nodes(nodes: list[Any]) -> str:
+    parts: list[str] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_type = node.get("type")
+        children = node.get("children")
+        if node_type == "a":
+            url = str(node.get("url") or "").strip()
+            label = _inline_html_from_nodes(children) if isinstance(children, list) else ""
+            if not label:
+                label = _escape_html(url)
+            if url:
+                parts.append(
+                    f'<a href="{_escape_html(url)}" target="_blank">{label}</a>'
+                )
+            else:
+                parts.append(label)
+            continue
+
+        if isinstance(children, list) and node_type:
+            parts.append(_inline_html_from_nodes(children))
+            continue
+
+        text = node.get("text")
+        if not isinstance(text, str) or text == "":
+            continue
+        chunk = _escape_html(text).replace("\n", "<br>")
+        if node.get("bold"):
+            chunk = f"<strong>{chunk}</strong>"
+        if node.get("italic"):
+            chunk = f"<em>{chunk}</em>"
+        if node.get("underline"):
+            chunk = f"<u>{chunk}</u>"
+        parts.append(chunk)
+    return "".join(parts)
+
+
+def _html_from_rich(value: Any) -> str:
+    """Convert Plate/Slate defaultText JSON into Spectora-style rich HTML."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return ""
+        if "<" in text and ">" in text:
+            return text
+        return f"<p>{_escape_html(text)}</p>"
+    if not isinstance(value, list):
+        text = str(value).strip()
+        return f"<p>{_escape_html(text)}</p>" if text else ""
+
+    paragraphs: list[str] = []
+    for node in value:
+        if not isinstance(node, dict):
+            continue
+        children = node.get("children")
+        if not isinstance(children, list):
+            continue
+        inner = _inline_html_from_nodes(children).strip()
+        if not inner:
+            continue
+        paragraphs.append(f"<p>{inner}</p>")
+    return "\n\n".join(paragraphs)
+
+
+def _comment_text_for_export(comment: dict[str, Any]) -> str:
+    """Prefer stored rich HTML; otherwise convert defaultText Plate JSON to HTML."""
+    rich_html = comment.get("richTextHtml") or comment.get("rich_text_html")
+    if isinstance(rich_html, str) and rich_html.strip():
+        return rich_html.strip()
+    return _html_from_rich(comment.get("defaultText"))
+
+
 def _flatten_template(tree: dict[str, Any]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     order_index = 0
@@ -77,7 +162,7 @@ def _flatten_template(tree: dict[str, Any]) -> list[dict[str, str]]:
                 row["section_name"] = section_title
                 row["item_name"] = item_title
                 row["comment_name"] = str(comment.get("name") or "")
-                row["comment_text"] = _plain_from_rich(comment.get("defaultText"))
+                row["comment_text"] = _comment_text_for_export(comment)
                 row["comment_type"] = str(comment.get("type") or "")
                 row["category"] = str(comment.get("category") or "")
                 row["mchoice"] = str(comment.get("answerChoices") or "")
