@@ -5,7 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from image_storage import ensure_image_dir, IMAGE_DIR
 import os
+from pathlib import Path
 
+# Load backend/app/.env even when uvicorn is started from another cwd.
+load_dotenv(Path(__file__).resolve().parent / ".env")
 load_dotenv()
 
 origins = [

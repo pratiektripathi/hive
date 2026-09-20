@@ -59,6 +59,7 @@ function MobileMenuToggle() {
 const MyTemplates = lazy(() => import("./my-templates"))
 const TemplateEditor = lazy(() => import("./template-editor"))
 const ManualCsvImport = lazy(() => import("./manual-csv-import"))
+const AiCsvImport = lazy(() => import("./ai-csv-import"))
 
 class PageErrorBoundary extends Component<
   { children: ReactNode },
@@ -87,13 +88,15 @@ export default function Layout() {
 
   const isTemplatesList = location.pathname === "/templates";
   const isManualImport = location.pathname === "/templates/import/manual";
+  const isAiImport = location.pathname === "/templates/import/ai";
   const isTemplateEditor =
-    location.pathname.startsWith("/templates/") && !isManualImport;
-  const collapseSidebar = isTemplateEditor || isManualImport;
+    location.pathname.startsWith("/templates/") && !isManualImport && !isAiImport;
+  const collapseSidebar = isTemplateEditor || isManualImport || isAiImport;
 
   const renderContent = () => {
     if (isTemplatesList) return <MyTemplates />;
     if (isManualImport) return <ManualCsvImport />;
+    if (isAiImport) return <AiCsvImport />;
     if (isTemplateEditor) return <TemplateEditor />;
     return <Navigate to="/templates" replace />;
   };
