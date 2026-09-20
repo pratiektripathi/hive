@@ -6,7 +6,13 @@ interface User {
   id: string;
   username: string;
   email?: string;
-  role?: "user" | "admin" | "superuser";
+}
+
+interface SignupData {
+  firstname: string;
+  lastname: string;
+  username: string;
+  password: string;
 }
 
 interface AuthContextType {
@@ -14,6 +20,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
+  signup: (data: SignupData) => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -30,28 +37,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = !!user;
 
-  // Function to dispatch theme sync event
   const dispatchThemeSync = () => {
     window.dispatchEvent(new CustomEvent('themeSync'));
   };
 
-  // Debug function to check cookie details
+  const applyUserFromMe = (userData: { id?: string | number; username?: string; email?: string; theme?: string }, fallbackUsername?: string) => {
+    setUser({
+      id: String(userData.id || '1'),
+      username: userData.username || fallbackUsername || '',
+      email: userData.email,
+    });
 
+    if (userData.theme) {
+      document.documentElement.classList.toggle('dark', userData.theme === 'dark');
+      dispatchThemeSync();
+    }
+  };
 
   const checkAuth = async () => {
     try {
-      // Check if we have an access token
       const token = sessionStorage.getItem('access_token');
       
       if (!token) {
-        // No token, try to refresh
         try {
           const refreshResponse = await api.post('/login/refresh');
           const { access_token } = refreshResponse.data;
           sessionStorage.setItem('access_token', access_token);
-          // Token set, proceed to fetch user
-        } catch (error) {
-          // Refresh failed, user is not logged in
+        } catch {
           setUser(null);
           setIsLoading(false);
           return;
@@ -62,30 +74,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const response = await api.get('/user/me');
         
         if (response.data && response.data.user) {
-          setUser(response.data.user);
-          // Apply theme if available
-          if (response.data.user.theme) {
-            document.documentElement.classList.toggle('dark', response.data.user.theme === 'dark');
-            dispatchThemeSync();
-          }
+          applyUserFromMe(response.data.user);
         } else if (response.data && response.data.username) {
-          // If the response structure is different, adapt accordingly
-          setUser({
-            id: response.data.id || '1',
-            username: response.data.username,
-            email: response.data.email,
-            role: response.data.role
-          });
-          // Apply theme if available
-          if (response.data.theme) {
-            document.documentElement.classList.toggle('dark', response.data.theme === 'dark');
-            dispatchThemeSync();
-          }
+          applyUserFromMe(response.data);
         } else {
           setUser(null);
         }
       } catch (error) {
-        // If we get here, it means even after potential refresh (handled by interceptor), it failed
         console.error('Auth check failed after attempts:', error);
         setUser(null);
         sessionStorage.removeItem('access_token');
@@ -99,12 +94,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const establishSession = async (accessToken: string, fallbackUsername?: string): Promise<boolean> => {
+    sessionStorage.setItem('access_token', accessToken);
+
+    try {
+      const userResponse = await api.get('/user/me');
+      applyUserFromMe(userResponse.data, fallbackUsername);
+      return true;
+    } catch (userError) {
+      console.error('Failed to fetch user data:', userError);
+      setUser({
+        id: '1',
+        username: fallbackUsername || '',
+      });
+      return true;
+    }
+  };
+
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
       
       if (username && password) {
-        // Create form data for OAuth2 password grant
         const formData = new URLSearchParams();     
         formData.append('username', username);
         formData.append('password', password);
@@ -116,49 +127,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
           },
           withCredentials: true
         });
-        console.log('Login response:', response.data);
 
         if (response.data.access_token) {
-          // Store access token
-          sessionStorage.setItem('access_token', response.data.access_token);
-
-          // After successful login, fetch complete user data including theme
-          try {
-            const userResponse = await api.get('/user/me');
-            const userData = userResponse.data;
-            
-            setUser({
-              id: userData.id || '1',
-              username: userData.username || username,
-              email: userData.email,
-              role: userData.role
-            });
-            
-            // Apply theme to document if theme exists
-            if (userData.theme) {
-              document.documentElement.classList.toggle('dark', userData.theme === 'dark');
-              // Sync the theme context state
-              dispatchThemeSync();
-            }
-            
-            return true;
-          } catch (userError) {
-            console.error('Failed to fetch user data:', userError);
-            // Fallback to basic user data if available in login response (usually not for standard OAuth2)
-             setUser({
-              id: '1',
-              username: username,
-              role: 'user' // Default or from decoded token if we decoded it
-            });
-            return true;
-          }
+          return await establishSession(response.data.access_token, username);
         }
         return false;
       }
       return false;
     } catch (error) {
       console.error('Login failed:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (data: SignupData): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+
+      const response = await api.post('/signup/', data, {
+        withCredentials: true
+      });
+
+      if (response.data.access_token) {
+        return await establishSession(response.data.access_token, data.username);
+      }
       return false;
+    } catch (error) {
+      console.error('Signup failed:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -166,12 +164,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     try {
-      // Call logout endpoint to clear the HTTP-only cookie
       await api.post('/logout/', {});
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {
-      // Clear user state and token regardless of API call success
       sessionStorage.removeItem('access_token');
       setUser(null);
     }
@@ -186,6 +182,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     isLoading,
     login,
+    signup,
     logout,
     checkAuth,
   };

@@ -7,7 +7,7 @@ export default function Home() {
           <div>
             <h1 className="text-xl font-bold">Home Dashboard</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              Welcome to Production ERP
+              Welcome to Temoter
             </p>
           </div>
         </div>

@@ -1,21 +1,15 @@
 import { SidebarProvider, SidebarTrigger} from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import Home from "./home"
-import Users from "./users"
 import { useLocation } from "react-router-dom"
-import { useAuth } from "@/contexts/AuthContext"
 
 export default function Layout() {
   const location = useLocation();
-  const { user } = useAuth();
 
   const renderContent = () => {
     switch (location.pathname) {
       case "/home":
         return <Home />;
-
-      case "/users":
-        return <Users />;
       default:
         return <Home />;
     }

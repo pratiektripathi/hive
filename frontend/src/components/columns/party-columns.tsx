@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreVertical, Edit, Trash2, MapPin, ChevronDown, ChevronRight } from "lucide-react"
 import { useState } from "react"
-import { useAuth } from "@/contexts/AuthContext"
 
 export type Party = {
   id: number
@@ -74,7 +73,6 @@ export const partyColumns: ColumnDef<Party>[] = [
     header: "Actions",
     cell: ({ row }) => {
       const party = row.original
-      const { user } = useAuth()
 
       return (
         <DropdownMenu>
@@ -89,18 +87,14 @@ export const partyColumns: ColumnDef<Party>[] = [
             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(party.sapcode)}>
               Copy SAP Code
             </DropdownMenuItem>
-            {(user?.role === "admin" || user?.role === "superuser") && (
-              <DropdownMenuItem>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Party
-              </DropdownMenuItem>
-            )}
-            {(user?.role === "admin" || user?.role === "superuser") && (
-              <DropdownMenuItem className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Party
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Party
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Party
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )

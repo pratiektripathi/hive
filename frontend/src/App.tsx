@@ -4,6 +4,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginRoute } from "./components/LoginRoute";
+import { SignupRoute } from "./components/SignupRoute";
 
 function App() {
   return (
@@ -13,14 +14,9 @@ function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginRoute />} />
+            <Route path="/signup" element={<SignupRoute />} />
             <Route path="/home" element={
               <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            } />
-
-            <Route path="/users" element={
-              <ProtectedRoute requiredRole="admin">
                 <Layout />
               </ProtectedRoute>
             } />

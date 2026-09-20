@@ -25,19 +25,12 @@ async def add_user(user:User, session: AsyncSession):
 
 async def verify_user(username:str, password:str, session: AsyncSession):
     user = await get_user(username=username, session=session)
-    print(user.password)
     if not user:
         return False
     if not verify_pass(password, user.password):
         return False
     
     return user
-
-
-async def all_users(skip, limit, session: AsyncSession):
-    result = await session.execute(select(User).where(User.role != "superuser").offset(skip).limit(limit))
-    users = result.scalars().all()
-    return users
 
 
 async def update_user_theme(username: str, theme: str, session: AsyncSession):

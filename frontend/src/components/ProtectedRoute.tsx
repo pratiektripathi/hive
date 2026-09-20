@@ -4,10 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: "admin" | "superuser";
 }
-export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -23,13 +22,6 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-
-  // Check role-based access using user data from AuthContext
-  if (requiredRole && user?.role !== requiredRole && user?.role !== "superuser") {
-    return <Navigate to="/home" replace />;
-  }
-
-
 
   return <>{children}</>;
 }

@@ -43,7 +43,7 @@
 
 :root {
   --radius: 0.65rem;
-  /* Production ERP Light Theme - Blue */
+  /* Temoter Light Theme - Blue */
   --background: #f7faff;
   --foreground: #16263a;
   --card: #ffffff;
@@ -78,7 +78,7 @@
 }
 
 .dark {
-  /* Production ERP Dark Theme - Blue */
+  /* Temoter Dark Theme - Blue */
   --background: #0f172a;
   --foreground: #e2e8f0;
   --card: #111c32;

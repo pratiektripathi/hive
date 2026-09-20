@@ -30,7 +30,11 @@ fi
 docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
 
 if [[ -f deploy/traefik/hive-template-importer.yml && -d /root/traefik-docker/dynamic ]]; then
-  cp deploy/traefik/hive-template-importer.yml "$TRAEFIK_DYNAMIC"
+  if [[ -w /root/traefik-docker/dynamic ]]; then
+    cp deploy/traefik/hive-template-importer.yml "$TRAEFIK_DYNAMIC"
+  else
+    sudo cp deploy/traefik/hive-template-importer.yml "$TRAEFIK_DYNAMIC"
+  fi
 fi
 
 docker compose config >/tmp/hive-template-importer-compose-check.txt

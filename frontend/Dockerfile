@@ -10,7 +10,7 @@ COPY . .
 ARG VITE_API_BASE=https://hiveapi.100xseller.com/api
 ENV VITE_API_BASE=$VITE_API_BASE
 
-RUN npm run build
+RUN npx vite build
 
 FROM node:22-alpine
 

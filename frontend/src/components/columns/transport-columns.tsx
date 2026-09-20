@@ -8,7 +8,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAuth } from "@/contexts/AuthContext"
 
 export type Transport = {
   id: number
@@ -113,7 +112,6 @@ export const createTransportColumns = (
     header: "Actions",
     cell: ({ row }) => {
       const transport = row.original
-      const { user } = useAuth()
 
       return (
         <DropdownMenu>
@@ -131,21 +129,17 @@ export const createTransportColumns = (
                 Copy SAP Code
               </DropdownMenuItem>
             )}
-            {user?.role === "admin" || user?.role === "superuser" ? (
-              <DropdownMenuItem onClick={() => onEdit(transport)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Transport
-              </DropdownMenuItem>
-            ) : null}
-            {user?.role === "admin" || user?.role === "superuser" ? (
-              <DropdownMenuItem 
-                onClick={() => onDelete(transport)}
-                className="text-red-600"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Transport
-              </DropdownMenuItem>
-            ) : null}
+            <DropdownMenuItem onClick={() => onEdit(transport)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Transport
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => onDelete(transport)}
+              className="text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Transport
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )

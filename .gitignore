@@ -13,3 +13,5 @@ frontend/dist/
 **/.venv/
 *.log
 .DS_Store
+scripts/_tmp_push.py
+scripts/_tmp_install_runner.py

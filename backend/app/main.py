@@ -47,6 +47,7 @@ def health():
     return {"ok": True}
 
 app.include_router(user.router, prefix="/api")
+app.include_router(user.signup_router, prefix="/api")
 app.include_router(token.router, prefix="/api")
 app.include_router(token.logout_router, prefix="/api")
 app.include_router(apikey.router, prefix="/api")

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -151,7 +151,7 @@ export function Login() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex-col gap-2">
+          <CardFooter className="flex-col gap-3">
             <Button 
               type="submit" 
               className="w-full text-lg py-4 mt-8"
@@ -159,6 +159,12 @@ export function Login() {
             >
               {isLoading ? "Logging in..." : "Login"}
             </Button>
+            <p className="text-sm text-center text-zinc-600 dark:text-zinc-400">
+              Don't have an account?{" "}
+              <Link to="/signup" className="underline font-medium text-zinc-900 dark:text-zinc-100">
+                Sign up
+              </Link>
+            </p>
           </CardFooter>
         </form>
       </Card>
