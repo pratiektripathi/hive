@@ -9,32 +9,58 @@ import {
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  AirVent,
   AlignJustify,
+  Armchair,
   ArrowUpDown,
+  Bath,
+  Bed,
+  BetweenVerticalEnd,
+  BookOpen,
+  BrickWall,
+  BrickWallFire,
   Building2,
   Calendar,
   Car,
   ChevronLeft,
+  ChevronRight,
+  CircleMinus,
+  CircleOff,
   ClipboardList,
+  CookingPot,
   Copy,
+  Cylinder,
   Droplets,
+  Fence,
   FileText,
   Flame,
   Hash,
   Home,
+  LampDesk,
   Layers,
-  CircleMinus,
+  Leaf,
+  PanelTop,
   Pencil,
   PenLine,
+  Plug,
   Plus,
+  Refrigerator,
+  Scissors,
   Snowflake,
+  Sofa,
   SquareCheck,
+  Table,
+  Toilet,
   Trash2,
   TriangleAlert,
+  Warehouse,
   Wand2,
+  WashingMachine,
+  Waves,
   Wind,
   Wrench,
   Zap,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -71,72 +97,67 @@ import {
   type RichTextValue,
 } from "@/components/rich-text-editor";
 import { cn } from "@/lib/utils";
-import { getTemplateById, SEED_TEMPLATES } from "@/lib/templates";
-
-type CommentType = "info" | "limit" | "defect";
-type DefectCategory = "low" | "medium" | "high";
-
-type TemplateComment = {
-  id: string;
-  name: string;
-  type: CommentType;
-  answerFormat?: string;
-  answerChoices?: string;
-  unitChoices?: string;
-  category?: DefectCategory;
-  recommendation?: string;
-  defaultChecked?: boolean;
-  defaultValue?: string;
-  defaultValue2?: string;
-  defaultLocation?: string;
-  defaultText?: RichTextValue;
-};
-
-type TemplateItem = {
-  id: string;
-  title: string;
-  comments: TemplateComment[];
-  reminders?: RichTextValue;
-};
-
-type TemplateSection = {
-  id: string;
-  title: string;
-  icon: string;
-  items: TemplateItem[];
-  standardsOfPractice?: RichTextValue;
-  reminders?: RichTextValue;
-};
+import {
+  RECOMMENDATIONS,
+  deleteCommentImage,
+  getTemplate,
+  listTemplates,
+  resolveImageUrl,
+  saveTemplate,
+  updateCommentImageCaption,
+  uploadCommentImage,
+  type CommentDefaultPhoto,
+  type CommentType,
+  type DefectCategory,
+  type TemplateComment,
+  type TemplateItem,
+  type TemplateRow,
+  type TemplateSection,
+} from "@/lib/templates";
 
 const EMPTY_SOP: RichTextValue = [{ type: "p", children: [{ text: "" }] }];
 
-const INSPECTION_DETAIL_SOP: RichTextValue = [
-  {
-    type: "p",
-    children: [
-      {
-        text: "Please refer to the Home Inspection Standards of Practice while reading this inspection report. I performed the home inspection according to the standards and my clients wishes and expectations. Please refer to the inspection contract or agreement between the inspector and the inspector's client.",
-      },
-    ],
-  },
-];
-
 const SECTION_ICONS = [
+  { id: "none", label: "No Icon", Icon: CircleOff },
   { id: "report", label: "Report", Icon: FileText },
   { id: "clipboard", label: "Inspection", Icon: ClipboardList },
   { id: "home", label: "Home", Icon: Home },
+  { id: "roof", label: "Roof", Icon: PanelTop },
   { id: "flame", label: "Flame", Icon: Flame },
+  { id: "chimney", label: "Chimney", Icon: BrickWallFire },
   { id: "building", label: "Building", Icon: Building2 },
+  { id: "wall", label: "Wall", Icon: BrickWall },
   { id: "car", label: "Car", Icon: Car },
+  { id: "garage", label: "Garage", Icon: Warehouse },
   { id: "layers", label: "Structure", Icon: Layers },
-  { id: "snowflake", label: "Cooling", Icon: Snowflake },
+  { id: "stairs", label: "Stairs", Icon: BetweenVerticalEnd },
+  { id: "snowflake", label: "Snowflake", Icon: Snowflake },
   { id: "droplets", label: "Plumbing", Icon: Droplets },
+  { id: "pipe", label: "Pipe", Icon: Cylinder },
   { id: "zap", label: "Electrical", Icon: Zap },
+  { id: "socket", label: "Socket", Icon: Plug },
   { id: "wind", label: "Ventilation", Icon: Wind },
+  { id: "exhaust", label: "Exhaust", Icon: AirVent },
+  { id: "fridge", label: "Fridge", Icon: Refrigerator },
+  { id: "cooktop", label: "Cook Top", Icon: CookingPot },
+  { id: "washing-machine", label: "Washing Machine", Icon: WashingMachine },
+  { id: "toilet", label: "Toilet", Icon: Toilet },
+  { id: "towel-holder", label: "Towel Holder", Icon: Bath },
+  { id: "bed", label: "Bed", Icon: Bed },
+  { id: "sofa", label: "Sofa", Icon: Sofa },
+  { id: "chair", label: "Chair", Icon: Armchair },
+  { id: "dining-table", label: "Dining Table", Icon: Table },
+  { id: "computer-table", label: "Computer Table", Icon: LampDesk },
+  { id: "books", label: "Books", Icon: BookOpen },
+  { id: "fence", label: "Fence", Icon: Fence },
+  { id: "swimming-pool", label: "Swimming Pool", Icon: Waves },
+  { id: "grass", label: "Grass", Icon: Leaf },
+  { id: "wrench", label: "Wrench", Icon: Wrench },
+  { id: "scissors", label: "Scissors", Icon: Scissors },
 ] as const;
 
 function getSectionIcon(id: string) {
-  return SECTION_ICONS.find((item) => item.id === id)?.Icon ?? Layers;
+  return SECTION_ICONS.find((item) => item.id === id)?.Icon ?? CircleOff;
 }
 
 type SectionEditorDraft = {
@@ -211,73 +232,6 @@ const DEFECT_CATEGORIES: {
   },
 ];
 
-const RECOMMENDATIONS = [
-  "No Recommendation",
-  "Appliance Repair",
-  "Builder",
-  "Cabinet Contractor",
-  "Carpentry Contractor",
-  "Carpet Cleaner",
-  "Chimney Repair Contractor",
-  "Chimney Sweep",
-  "Cleaning Service",
-  "Concrete Contractor",
-  "Countertop Contractor",
-  "Deck Contractor",
-  "DIY",
-  "Door Repair and Installation Contractor",
-  "Driveway Contractor",
-  "Drywall Contractor",
-  "Electrical Contractor",
-  "Environmental Contractor",
-  "Fence Contractor",
-  "Fireplace Contractor",
-  "Fire Suppression Contractor",
-  "Flooring Contractor",
-  "Foundation Contractor",
-  "Garage Door Contractor",
-  "General Contractor",
-  "Grading Contractor",
-  "Gutter Contractor",
-  "Handyman",
-  "Handyman/DIY",
-  "Heating and Cooling Contractor",
-  "Home Energy Contractor",
-  "Homeowners Association",
-  "HVAC Professional",
-  "Inquire With Seller",
-  "Insulation Contractor",
-  "Landscaping Contractor",
-  "Lawncare Professional",
-  "Masonry, Concrete, Brick & Stone",
-  "Masonry Contractor",
-  "Masonry Restoration Contractor",
-  "Mold Inspector",
-  "Mold Remediation Contractor",
-  "Monitor",
-  "Painting Contractor",
-  "Pest Control Pro",
-  "Plumbing Contractor",
-  "Professional Engineer",
-  "Professional Locksmith",
-  "Qualified Professional",
-  "Radon Mitigation Specialist",
-  "Roofing Professional",
-  "Septic System Contractor",
-  "Sheet Metal Contractor",
-  "Siding Contractor",
-  "Solar Panel Contractor",
-  "Structural Engineer",
-  "Stucco Repair Contractor",
-  "Swimming Pool / Spa Contractor",
-  "Tile Contractor",
-  "Tree Service",
-  "Utility Company",
-  "Waterproofing Contractor",
-  "Well Service Contractor",
-  "Window Repair and Installation Contractor",
-] as const;
-
 const COMMENT_GROUPS: { type: CommentType; label: string }[] = [
   { type: "info", label: "Informational" },
   { type: "limit", label: "Limitations" },
@@ -327,104 +281,7 @@ function CommentFormatIcon({
   }
 }
 
-const SAMPLE_SECTIONS: TemplateSection[] = [
-  {
-    id: "inspection-detail",
-    title: "Inspection Detail",
-    icon: "report",
-    standardsOfPractice: INSPECTION_DETAIL_SOP,
-    items: [
-      {
-        id: "general-inspection-info",
-        title: "General Inspection Info",
-        comments: [
-          { id: "in-attendance", name: "In Attendance", type: "info" },
-          { id: "occupancy", name: "Occupancy", type: "info" },
-          { id: "weather-conditions", name: "Weather Conditions", type: "info" },
-          { id: "type-of-building", name: "Type of Building", type: "info" },
-          { id: "inspection-scope", name: "Inspection Scope", type: "limit" },
-          { id: "weather-limitations", name: "Weather Limitations", type: "limit" },
-        ],
-      },
-      { id: "your-job", title: "Your Job As a Homeowner", comments: [] },
-      { id: "buy-back", title: "Buy Back Guarantee", comments: [] },
-      { id: "honor-guarantee", title: "$10,000 Honor Guarantee", comments: [] },
-      { id: "while-im-here", title: "While I'm Here...", comments: [] },
-    ],
-  },
-  {
-    id: "roof",
-    title: "Roof",
-    icon: "home",
-    items: [
-      { id: "roof-covering", title: "Roof Covering", comments: [] },
-      { id: "flashings", title: "Flashings", comments: [] },
-      { id: "gutters", title: "Gutters & Downspouts", comments: [] },
-    ],
-  },
-  {
-    id: "chimney",
-    title: "Chimney, Fireplace, or Stove",
-    icon: "flame",
-    items: [{ id: "chimney-structure", title: "Chimney Structure", comments: [] }],
-  },
-  {
-    id: "exterior",
-    title: "Exterior",
-    icon: "building",
-    items: [
-      { id: "wall-cladding", title: "Wall Cladding", comments: [] },
-      { id: "windows", title: "Windows", comments: [] },
-    ],
-  },
-  {
-    id: "carport",
-    title: "Carport",
-    icon: "car",
-    items: [{ id: "carport-structure", title: "Carport Structure", comments: [] }],
-  },
-  {
-    id: "basement",
-    title: "Basement, Foundation, Crawlspace & Structure",
-    icon: "layers",
-    items: [{ id: "foundation", title: "Foundation", comments: [] }],
-  },
-  {
-    id: "heating",
-    title: "Heating",
-    icon: "flame",
-    items: [{ id: "heating-system", title: "Heating System", comments: [] }],
-  },
-  {
-    id: "cooling",
-    title: "Cooling",
-    icon: "snowflake",
-    items: [{ id: "cooling-system", title: "Cooling System", comments: [] }],
-  },
-  {
-    id: "plumbing",
-    title: "Plumbing",
-    icon: "droplets",
-    items: [{ id: "water-supply", title: "Water Supply", comments: [] }],
-  },
-  {
-    id: "electrical",
-    title: "Electrical",
-    icon: "zap",
-    items: [{ id: "service-panel", title: "Service Panel", comments: [] }],
-  },
-  {
-    id: "attic",
-    title: "Attic, Insulation & Ventilation",
-    icon: "wind",
-    items: [{ id: "attic-insulation", title: "Insulation", comments: [] }],
-  },
-];
-
-function templateNameFromLocation(
-  templateId: string | undefined,
-  state: unknown
-) {
+function templateNameFromLocation(state: unknown) {
   if (
     typeof state === "object" &&
     state &&
@@ -434,7 +291,7 @@ function templateNameFromLocation(
   ) {
     return state.name;
   }
-  return getTemplateById(templateId)?.name || "Template";
+  return "Template";
 }
 
 function duplicatedSectionFromLocation(state: unknown): TemplateSection | undefined {
@@ -487,12 +344,20 @@ function duplicatedCommentsFromLocation(state: unknown): {
   };
 }
 
-function nextId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+function nextId(_prefix?: string) {
+  return crypto.randomUUID();
 }
 
 function cloneComment(comment: TemplateComment): TemplateComment {
-  return { ...comment, id: nextId("comment") };
+  return { ...comment, id: nextId(), defaultPhotos: [] };
+}
+
+function cloneItem(item: TemplateItem): TemplateItem {
+  return {
+    ...item,
+    id: nextId(),
+    comments: item.comments.map((comment) => cloneComment(comment)),
+  };
 }
 
 function insertItem(
@@ -583,13 +448,17 @@ function removeComments(
 function cloneSection(section: TemplateSection): TemplateSection {
   return {
     ...section,
-    id: nextId("section"),
+    id: nextId(),
     items: section.items.map((item) => cloneItem(item)),
   };
 }
 
-function templateChoices(templateId: string | undefined, currentName: string) {
-  const choices = SEED_TEMPLATES.map((template) => ({
+function templateChoices(
+  templates: TemplateRow[],
+  templateId: string | undefined,
+  currentName: string
+) {
+  const choices = templates.map((template) => ({
     id: template.id,
     name: template.id === templateId ? currentName : template.name,
   }));
@@ -677,20 +546,23 @@ export default function TemplateEditor() {
   const { templateId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const initialName = templateNameFromLocation(templateId, location.state);
+  const initialName = templateNameFromLocation(location.state);
   const [title, setTitle] = useState(initialName);
   const [draft, setDraft] = useState(initialName);
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [sections, setSections] = useState(SAMPLE_SECTIONS);
-  const [selectedSectionId, setSelectedSectionId] = useState(SAMPLE_SECTIONS[0]?.id);
-  const [selectedItemId, setSelectedItemId] = useState(
-    SAMPLE_SECTIONS[0]?.items[0]?.id
-  );
+  const [sections, setSections] = useState<TemplateSection[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | undefined>();
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>();
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateRow[]>([]);
+  const [transferSections, setTransferSections] = useState<TemplateSection[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [checkedCommentIds, setCheckedCommentIds] = useState<string[]>([]);
   const [dragging, setDragging] = useState<{ kind: DragKind; id: string } | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const skipClickAfterDrag = useRef(false);
+  const skipNextSave = useRef(true);
   const [sectionEditor, setSectionEditor] = useState<SectionEditorDraft | null>(null);
   const [itemEditor, setItemEditor] = useState<ItemEditorDraft | null>(null);
   const [commentEditor, setCommentEditor] = useState<CommentEditorDraft | null>(null);
@@ -700,7 +572,7 @@ export default function TemplateEditor() {
   const [duplicatingComments, setDuplicatingComments] = useState<TemplateComment[]>([]);
   const [movingComments, setMovingComments] = useState<TemplateComment[]>([]);
   const [duplicateToTemplateId, setDuplicateToTemplateId] = useState(
-    templateId || SEED_TEMPLATES[0]?.id || "current"
+    templateId || "current"
   );
   const [duplicateCommentSectionId, setDuplicateCommentSectionId] = useState<string>();
   const [duplicateCommentItemId, setDuplicateCommentItemId] = useState<string>();
@@ -710,6 +582,8 @@ export default function TemplateEditor() {
   const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
+  const [itemsCollapsed, setItemsCollapsed] = useState(false);
 
   const startRowDrag = (kind: DragKind, id: string, event: DragEvent) => {
     if ((event.target as HTMLElement).closest("[data-no-drag]")) {
@@ -736,47 +610,113 @@ export default function TemplateEditor() {
   };
 
   useEffect(() => {
-    const next = templateNameFromLocation(templateId, location.state);
-    setTitle(next);
-    setDraft(next);
-    setEditing(false);
+    let cancelled = false;
+    listTemplates()
+      .then((rows) => {
+        if (!cancelled) setAvailableTemplates(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableTemplates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    const incomingSection = duplicatedSectionFromLocation(location.state);
-    const incomingItem = duplicatedItemFromLocation(location.state);
-    if (incomingSection) {
-      setSections([incomingSection, ...SAMPLE_SECTIONS]);
-      setSelectedSectionId(incomingSection.id);
-      setSelectedItemId(incomingSection.items[0]?.id);
-      setCheckedCommentIds([]);
+  useEffect(() => {
+    if (!templateId) {
+      setLoadError("Missing template id.");
+      setLoading(false);
       return;
     }
-    if (incomingItem) {
-      const sectionId = incomingItem.sectionId || SAMPLE_SECTIONS[0]?.id;
-      if (sectionId) {
-        setSections(insertItem(SAMPLE_SECTIONS, sectionId, incomingItem.item));
-        setSelectedSectionId(sectionId);
-        setSelectedItemId(incomingItem.item.id);
+
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      skipNextSave.current = true;
+      try {
+        const detail = await getTemplate(templateId);
+        if (cancelled) return;
+
+        let nextSections = detail.sections ?? [];
+        const incomingSection = duplicatedSectionFromLocation(location.state);
+        const incomingItem = duplicatedItemFromLocation(location.state);
+        const incomingComments = duplicatedCommentsFromLocation(location.state);
+
+        if (incomingSection) {
+          nextSections = [incomingSection, ...nextSections];
+          setSelectedSectionId(incomingSection.id);
+          setSelectedItemId(incomingSection.items[0]?.id);
+        } else if (incomingItem) {
+          const sectionId = incomingItem.sectionId || nextSections[0]?.id;
+          if (sectionId) {
+            nextSections = insertItem(nextSections, sectionId, incomingItem.item);
+            setSelectedSectionId(sectionId);
+            setSelectedItemId(incomingItem.item.id);
+          }
+        } else if (incomingComments) {
+          const sectionId = incomingComments.sectionId || nextSections[0]?.id;
+          const itemId =
+            incomingComments.itemId ||
+            nextSections.find((section) => section.id === sectionId)?.items[0]?.id ||
+            nextSections[0]?.items[0]?.id;
+          if (sectionId && itemId) {
+            nextSections = insertComments(
+              nextSections,
+              sectionId,
+              itemId,
+              incomingComments.comments
+            );
+            setSelectedSectionId(sectionId);
+            setSelectedItemId(itemId);
+          }
+        } else {
+          setSelectedSectionId(nextSections[0]?.id);
+          setSelectedItemId(nextSections[0]?.items[0]?.id);
+        }
+
+        const nameFromState = templateNameFromLocation(location.state);
+        const nextTitle =
+          nameFromState !== "Template" ? nameFromState : detail.name || "Template";
+        setTitle(nextTitle);
+        setDraft(nextTitle);
+        setEditing(false);
+        setSections(nextSections);
         setCheckedCommentIds([]);
+        setDuplicateToTemplateId(templateId);
+
+        if (incomingSection || incomingItem || incomingComments) {
+          skipNextSave.current = false;
+        }
+      } catch {
+        if (!cancelled) {
+          setLoadError("Failed to load template.");
+          setSections([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      return;
-    }
-    const incomingComments = duplicatedCommentsFromLocation(location.state);
-    if (incomingComments) {
-      const sectionId = incomingComments.sectionId || SAMPLE_SECTIONS[0]?.id;
-      const itemId =
-        incomingComments.itemId ||
-        SAMPLE_SECTIONS.find((section) => section.id === sectionId)?.items[0]?.id ||
-        SAMPLE_SECTIONS[0]?.items[0]?.id;
-      if (sectionId && itemId) {
-        setSections(
-          insertComments(SAMPLE_SECTIONS, sectionId, itemId, incomingComments.comments)
-        );
-        setSelectedSectionId(sectionId);
-        setSelectedItemId(itemId);
-        setCheckedCommentIds([]);
-      }
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [templateId, location.state]);
+
+  useEffect(() => {
+    if (loading || !templateId) return;
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void saveTemplate(templateId, { name: title, sections }).catch(() => {
+        // Keep editing; transient save errors shouldn't block further saves.
+      });
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [sections, title, templateId, loading]);
 
   useEffect(() => {
     if (editing) {
@@ -800,6 +740,22 @@ export default function TemplateEditor() {
     () => selectedSection?.items.find((item) => item.id === selectedItemId),
     [selectedSection, selectedItemId]
   );
+
+  const resolveTransferSections = async (destinationId: string) => {
+    const currentId = templateId || "current";
+    if (destinationId === currentId) {
+      setTransferSections(sections);
+      return sections;
+    }
+    try {
+      const detail = await getTemplate(destinationId);
+      setTransferSections(detail.sections);
+      return detail.sections;
+    } catch {
+      setTransferSections([]);
+      return [];
+    }
+  };
 
   const startEdit = () => {
     setDraft(title);
@@ -836,7 +792,7 @@ export default function TemplateEditor() {
 
   const openNewSectionEditor = () => {
     setSectionEditor({
-      id: nextId("section"),
+      id: nextId(),
       title: "",
       icon: "layers",
       standardsOfPractice: EMPTY_SOP,
@@ -848,7 +804,7 @@ export default function TemplateEditor() {
   const openNewItemEditor = () => {
     if (!selectedSection) return;
     setItemEditor({
-      id: nextId("item"),
+      id: nextId(),
       title: "",
       reminders: EMPTY_SOP,
       mode: "create",
@@ -894,7 +850,7 @@ export default function TemplateEditor() {
   const openNewCommentEditor = (type: CommentType) => {
     if (!selectedSection || !selectedItem) return;
     setCommentEditor({
-      id: nextId("comment"),
+      id: nextId(),
       type,
       answerFormat: "checkbox",
       choices: "",
@@ -1170,9 +1126,13 @@ export default function TemplateEditor() {
   };
 
   const openDuplicateSection = (section: TemplateSection) => {
-    setDuplicateToTemplateId(templateId || SEED_TEMPLATES[0]?.id || "current");
+    setDuplicateToTemplateId(templateId || "current");
+    setTransferSections(sections);
     setDuplicatingSection(section);
   };
+
+  const destinationName = (destinationId: string) =>
+    availableTemplates.find((template) => template.id === destinationId)?.name || "Template";
 
   const duplicateSection = () => {
     if (!duplicatingSection) return;
@@ -1191,9 +1151,8 @@ export default function TemplateEditor() {
       setSelectedItemId(copy.items[0]?.id);
       setCheckedCommentIds([]);
     } else {
-      const destination = getTemplateById(destinationId);
       navigate(`/templates/${destinationId}`, {
-        state: { name: destination?.name || "Template", duplicatedSection: copy },
+        state: { name: destinationName(destinationId), duplicatedSection: copy },
       });
     }
     setDuplicatingSection(null);
@@ -1255,8 +1214,9 @@ export default function TemplateEditor() {
   };
 
   const openItemTransfer = (item: TemplateItem, mode: "duplicate" | "move") => {
-    const currentId = templateId || SEED_TEMPLATES[0]?.id || "current";
+    const currentId = templateId || "current";
     setDuplicateToTemplateId(currentId);
+    setTransferSections(sections);
     setDuplicateItemSectionId(selectedSectionId);
     if (mode === "move") {
       setMovingItem(item);
@@ -1267,10 +1227,9 @@ export default function TemplateEditor() {
     }
   };
 
-  const changeDuplicateItemTemplate = (id: string) => {
-    const currentId = templateId || "current";
-    const nextSections = id === currentId ? sections : SAMPLE_SECTIONS;
+  const changeDuplicateItemTemplate = async (id: string) => {
     setDuplicateToTemplateId(id);
+    const nextSections = await resolveTransferSections(id);
     setDuplicateItemSectionId(nextSections[0]?.id);
   };
 
@@ -1293,10 +1252,9 @@ export default function TemplateEditor() {
       setSelectedItemId(copy.id);
       setCheckedCommentIds([]);
     } else {
-      const destination = getTemplateById(destinationId);
       navigate(`/templates/${destinationId}`, {
         state: {
-          name: destination?.name || "Template",
+          name: destinationName(destinationId),
           duplicatedItem: copy,
           targetSectionId: duplicateItemSectionId,
         },
@@ -1337,10 +1295,9 @@ export default function TemplateEditor() {
         setEditingCommentId(null);
       }
     } else {
-      const destination = getTemplateById(destinationId);
       navigate(`/templates/${destinationId}`, {
         state: {
-          name: destination?.name || "Template",
+          name: destinationName(destinationId),
           duplicatedItem: movingItem,
           targetSectionId: destSectionId,
         },
@@ -1355,8 +1312,9 @@ export default function TemplateEditor() {
   ) => {
     const list = Array.isArray(comments) ? comments : [comments];
     if (!list.length) return;
-    const currentId = templateId || SEED_TEMPLATES[0]?.id || "current";
+    const currentId = templateId || "current";
     setDuplicateToTemplateId(currentId);
+    setTransferSections(sections);
     setDuplicateCommentSectionId(selectedSectionId);
     setDuplicateCommentItemId(selectedItemId);
     if (mode === "move") {
@@ -1368,17 +1326,17 @@ export default function TemplateEditor() {
     }
   };
 
-  const changeDuplicateCommentTemplate = (id: string) => {
-    const currentId = templateId || "current";
-    const nextSections = id === currentId ? sections : SAMPLE_SECTIONS;
+  const changeDuplicateCommentTemplate = async (id: string) => {
     setDuplicateToTemplateId(id);
+    const nextSections = await resolveTransferSections(id);
     setDuplicateCommentSectionId(nextSections[0]?.id);
     setDuplicateCommentItemId(nextSections[0]?.items[0]?.id);
   };
 
   const changeDuplicateCommentSection = (id: string) => {
     const currentId = templateId || "current";
-    const nextSections = duplicateToTemplateId === currentId ? sections : SAMPLE_SECTIONS;
+    const nextSections =
+      duplicateToTemplateId === currentId ? sections : transferSections;
     const nextSection = nextSections.find((section) => section.id === id);
     setDuplicateCommentSectionId(id);
     setDuplicateCommentItemId(nextSection?.items[0]?.id);
@@ -1408,10 +1366,9 @@ export default function TemplateEditor() {
       setSelectedItemId(duplicateCommentItemId);
       setCheckedCommentIds([]);
     } else {
-      const destination = getTemplateById(destinationId);
       navigate(`/templates/${destinationId}`, {
         state: {
-          name: destination?.name || "Template",
+          name: destinationName(destinationId),
           duplicatedComments: copies,
           targetSectionId: duplicateCommentSectionId,
           targetItemId: duplicateCommentItemId,
@@ -1456,10 +1413,9 @@ export default function TemplateEditor() {
         setEditingCommentId(null);
       }
     } else {
-      const destination = getTemplateById(destinationId);
       navigate(`/templates/${destinationId}`, {
         state: {
-          name: destination?.name || "Template",
+          name: destinationName(destinationId),
           duplicatedComments: movingComments,
           targetSectionId: destSectionId,
           targetItemId: destItemId,
@@ -1471,10 +1427,30 @@ export default function TemplateEditor() {
 
   const currentTemplateKey = templateId || "current";
   const commentDuplicateSections =
-    duplicateToTemplateId === currentTemplateKey ? sections : SAMPLE_SECTIONS;
+    duplicateToTemplateId === currentTemplateKey ? sections : transferSections;
   const commentDuplicateItems =
     commentDuplicateSections.find((section) => section.id === duplicateCommentSectionId)
       ?.items ?? [];
+  const templateSelectOptions = templateChoices(availableTemplates, templateId, title);
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        Loading template...
+      </div>
+    );
+  }
+
+  if (loadError && sections.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+        <p>{loadError}</p>
+        <Button variant="outline" onClick={() => navigate("/templates")}>
+          Back to templates
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -1532,181 +1508,214 @@ export default function TemplateEditor() {
       </header>
       <Separator />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[25%_25%_1fr]">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 transition-[grid-template-columns] duration-200",
+          sectionsCollapsed && itemsCollapsed && "grid-cols-[2.75rem_2.75rem_1fr]",
+          sectionsCollapsed && !itemsCollapsed && "grid-cols-[2.75rem_25%_1fr]",
+          !sectionsCollapsed && itemsCollapsed && "grid-cols-[25%_2.75rem_1fr]",
+          !sectionsCollapsed && !itemsCollapsed && "grid-cols-[25%_25%_1fr]"
+        )}
+      >
         <section className="flex min-h-0 min-w-0 flex-col border-r">
-          <PaneHeader>Sections</PaneHeader>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1">
-            {sections.map((section) => {
-              const selected = section.id === selectedSectionId;
-              const Icon = getSectionIcon(section.icon);
-              const isOver =
-                dragging?.kind === "section" &&
-                overId === section.id &&
-                dragging.id !== section.id;
-              return (
-                <div
-                  key={section.id}
-                  draggable
-                  onClick={() => onRowClick(() => selectSection(section.id))}
-                  onDragStart={(event) => startRowDrag("section", section.id, event)}
-                  onDragEnd={endRowDrag}
-                  onDragOver={(event) => {
-                    if (dragging?.kind !== "section") return;
-                    event.preventDefault();
-                    setOverId(section.id);
-                  }}
-                  onDragLeave={() => {
-                    setOverId((current) => (current === section.id ? null : current));
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (dragging?.kind === "section") {
-                      moveSection(dragging.id, section.id);
-                    }
-                    endRowDrag();
-                  }}
-                  className={cn(
-                    "group flex w-full cursor-grab items-center gap-2 px-3 py-2 text-left text-sm active:cursor-grabbing",
-                    selected ? "bg-muted font-bold" : "hover:bg-muted/60",
-                    isOver && "border-t-2 border-orange-500"
-                  )}
-                  role="listitem"
-                  aria-label={section.title}
-                >
-                  <DragHandle visible={dragging?.id === section.id} />
-                  <Icon className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
-                    {section.title}
-                  </span>
-                  <span
-                    className={cn(
-                      "ml-auto shrink-0 items-center",
-                      selected ? "flex" : "hidden group-hover:flex"
-                    )}
-                  >
-                    <RowIconButton
-                      label={`Edit ${section.title}`}
-                      onClick={() => openSectionEditor(section)}
+          {sectionsCollapsed ? (
+            <CollapsedPane
+              label="Sections"
+              onExpand={() => setSectionsCollapsed(false)}
+            />
+          ) : (
+            <>
+              <PaneHeader
+                onToggleCollapse={() => setSectionsCollapsed(true)}
+                collapseLabel="Collapse sections"
+              >
+                Sections
+              </PaneHeader>
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1">
+                {sections.map((section) => {
+                  const selected = section.id === selectedSectionId;
+                  const Icon = getSectionIcon(section.icon);
+                  const isOver =
+                    dragging?.kind === "section" &&
+                    overId === section.id &&
+                    dragging.id !== section.id;
+                  return (
+                    <div
+                      key={section.id}
+                      draggable
+                      onClick={() => onRowClick(() => selectSection(section.id))}
+                      onDragStart={(event) => startRowDrag("section", section.id, event)}
+                      onDragEnd={endRowDrag}
+                      onDragOver={(event) => {
+                        if (dragging?.kind !== "section") return;
+                        event.preventDefault();
+                        setOverId(section.id);
+                      }}
+                      onDragLeave={() => {
+                        setOverId((current) => (current === section.id ? null : current));
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (dragging?.kind === "section") {
+                          moveSection(dragging.id, section.id);
+                        }
+                        endRowDrag();
+                      }}
+                      className={cn(
+                        "group flex w-full cursor-grab items-center gap-2 px-3 py-2 text-left text-sm active:cursor-grabbing",
+                        selected ? "bg-muted font-bold" : "hover:bg-muted/60",
+                        isOver && "border-t-2 border-orange-500"
+                      )}
+                      role="listitem"
+                      aria-label={section.title}
                     >
-                      <Pencil />
-                    </RowIconButton>
-                    <RowIconButton
-                      label={`Duplicate ${section.title}`}
-                      onClick={() => openDuplicateSection(section)}
-                    >
-                      <Copy />
-                    </RowIconButton>
-                    <RowIconButton
-                      label={`Delete ${section.title}`}
-                      onClick={() => requestDelete("section", section.id, section.title)}
-                    >
-                      <Trash2 />
-                    </RowIconButton>
-                  </span>
+                      <DragHandle visible={dragging?.id === section.id} />
+                      <Icon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
+                        {section.title}
+                      </span>
+                      <span
+                        className={cn(
+                          "ml-auto shrink-0 items-center",
+                          selected ? "flex" : "hidden group-hover:flex"
+                        )}
+                      >
+                        <RowIconButton
+                          label={`Edit ${section.title}`}
+                          onClick={() => openSectionEditor(section)}
+                        >
+                          <Pencil />
+                        </RowIconButton>
+                        <RowIconButton
+                          label={`Duplicate ${section.title}`}
+                          onClick={() => openDuplicateSection(section)}
+                        >
+                          <Copy />
+                        </RowIconButton>
+                        <RowIconButton
+                          label={`Delete ${section.title}`}
+                          onClick={() => requestDelete("section", section.id, section.title)}
+                        >
+                          <Trash2 />
+                        </RowIconButton>
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="mt-3 flex justify-center pb-4">
+                  <Button type="button" variant="outline" size="sm" onClick={openNewSectionEditor}>
+                    <Plus />
+                    Section
+                  </Button>
                 </div>
-              );
-            })}
-            <div className="mt-3 flex justify-center pb-4">
-              <Button type="button" variant="outline" size="sm" onClick={openNewSectionEditor}>
-                <Plus />
-                Section
-              </Button>
-            </div>
-          </div>
+              </div>
+            </>
+          )}
         </section>
 
         <section className="flex min-h-0 min-w-0 flex-col border-r">
-          <PaneHeader>Items</PaneHeader>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1">
-            {selectedSection?.items.length ? (
-              selectedSection.items.map((item) => {
-                const selected = item.id === selectedItemId;
-                const isOver =
-                  dragging?.kind === "item" &&
-                  overId === item.id &&
-                  dragging.id !== item.id;
-                return (
-                  <div
-                    key={item.id}
-                    draggable
-                    onClick={() => onRowClick(() => selectItem(item.id))}
-                    onDragStart={(event) => startRowDrag("item", item.id, event)}
-                    onDragEnd={endRowDrag}
-                    onDragOver={(event) => {
-                      if (dragging?.kind !== "item") return;
-                      event.preventDefault();
-                      setOverId(item.id);
-                    }}
-                    onDragLeave={() => {
-                      setOverId((current) => (current === item.id ? null : current));
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      if (dragging?.kind === "item") {
-                        moveItem(dragging.id, item.id);
-                      }
-                      endRowDrag();
-                    }}
-                    className={cn(
-                      "group flex w-full cursor-grab items-center gap-2 px-3 py-2 text-left text-sm active:cursor-grabbing",
-                      selected ? "bg-muted font-bold text-foreground" : "hover:bg-muted/60",
-                      isOver && "border-t-2 border-orange-500"
-                    )}
-                    role="listitem"
-                    aria-label={item.title}
-                  >
-                    <DragHandle visible={dragging?.id === item.id} />
-                    <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
-                      {item.title}
-                    </span>
-                    <span
-                      className={cn(
-                        "ml-auto shrink-0 items-center",
-                        selected ? "flex" : "hidden group-hover:flex"
-                      )}
-                    >
-                      <RowIconButton
-                        label={`Edit ${item.title}`}
-                        onClick={() => openItemEditor(item)}
+          {itemsCollapsed ? (
+            <CollapsedPane label="Items" onExpand={() => setItemsCollapsed(false)} />
+          ) : (
+            <>
+              <PaneHeader
+                onToggleCollapse={() => setItemsCollapsed(true)}
+                collapseLabel="Collapse items"
+              >
+                Items
+              </PaneHeader>
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto py-1">
+                {selectedSection?.items.length ? (
+                  selectedSection.items.map((item) => {
+                    const selected = item.id === selectedItemId;
+                    const isOver =
+                      dragging?.kind === "item" &&
+                      overId === item.id &&
+                      dragging.id !== item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        draggable
+                        onClick={() => onRowClick(() => selectItem(item.id))}
+                        onDragStart={(event) => startRowDrag("item", item.id, event)}
+                        onDragEnd={endRowDrag}
+                        onDragOver={(event) => {
+                          if (dragging?.kind !== "item") return;
+                          event.preventDefault();
+                          setOverId(item.id);
+                        }}
+                        onDragLeave={() => {
+                          setOverId((current) => (current === item.id ? null : current));
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (dragging?.kind === "item") {
+                            moveItem(dragging.id, item.id);
+                          }
+                          endRowDrag();
+                        }}
+                        className={cn(
+                          "group flex w-full cursor-grab items-center gap-2 px-3 py-2 text-left text-sm active:cursor-grabbing",
+                          selected ? "bg-muted font-bold text-foreground" : "hover:bg-muted/60",
+                          isOver && "border-t-2 border-orange-500"
+                        )}
+                        role="listitem"
+                        aria-label={item.title}
                       >
-                        <Pencil />
-                      </RowIconButton>
-                      <RowIconButton
-                        label={`Duplicate ${item.title}`}
-                        onClick={() => openItemTransfer(item, "duplicate")}
-                      >
-                        <Copy />
-                      </RowIconButton>
-                      <RowIconButton
-                        label={`Move ${item.title}`}
-                        onClick={() => openItemTransfer(item, "move")}
-                      >
-                        <MoveTreeIcon />
-                      </RowIconButton>
-                      <RowIconButton
-                        label={`Delete ${item.title}`}
-                        onClick={() => requestDelete("item", item.id, item.title)}
-                      >
-                        <Trash2 />
-                      </RowIconButton>
-                    </span>
+                        <DragHandle visible={dragging?.id === item.id} />
+                        <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">
+                          {item.title}
+                        </span>
+                        <span
+                          className={cn(
+                            "ml-auto shrink-0 items-center",
+                            selected ? "flex" : "hidden group-hover:flex"
+                          )}
+                        >
+                          <RowIconButton
+                            label={`Edit ${item.title}`}
+                            onClick={() => openItemEditor(item)}
+                          >
+                            <Pencil />
+                          </RowIconButton>
+                          <RowIconButton
+                            label={`Duplicate ${item.title}`}
+                            onClick={() => openItemTransfer(item, "duplicate")}
+                          >
+                            <Copy />
+                          </RowIconButton>
+                          <RowIconButton
+                            label={`Move ${item.title}`}
+                            onClick={() => openItemTransfer(item, "move")}
+                          >
+                            <MoveTreeIcon />
+                          </RowIconButton>
+                          <RowIconButton
+                            label={`Delete ${item.title}`}
+                            onClick={() => requestDelete("item", item.id, item.title)}
+                          >
+                            <Trash2 />
+                          </RowIconButton>
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="px-3 py-6 text-sm text-muted-foreground">
+                    Select a section to see its items.
+                  </p>
+                )}
+                {selectedSection ? (
+                  <div className="mt-3 flex justify-center pb-4">
+                    <Button type="button" variant="outline" size="sm" onClick={openNewItemEditor}>
+                      <Plus />
+                      Item
+                    </Button>
                   </div>
-                );
-              })
-            ) : (
-              <p className="px-3 py-6 text-sm text-muted-foreground">
-                Select a section to see its items.
-              </p>
-            )}
-            {selectedSection ? (
-              <div className="mt-3 flex justify-center pb-4">
-                <Button type="button" variant="outline" size="sm" onClick={openNewItemEditor}>
-                  <Plus />
-                  Item
-                </Button>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </>
+          )}
         </section>
 
         <section className="flex min-h-0 min-w-0 flex-col bg-muted/20">
@@ -1911,8 +1920,16 @@ export default function TemplateEditor() {
                                   onClick={(event) => event.stopPropagation()}
                                 >
                                   <CommentExpandedPanel
+                                    templateId={templateId}
                                     comment={comment}
                                     onChange={(patch) => updateComment(comment.id, patch)}
+                                    onEnsureSaved={async () => {
+                                      if (!templateId) return;
+                                      await saveTemplate(templateId, {
+                                        name: title,
+                                        sections,
+                                      });
+                                    }}
                                   />
                                 </div>
                               ) : null}
@@ -1945,7 +1962,7 @@ export default function TemplateEditor() {
         description="This will create a copy of this section, along with all items and comments within it. Please be patient, as large sections may take several seconds."
         helperText="You may choose to send the duplicated section to another template:"
         selectLabel="Duplicate to template:"
-        templates={templateChoices(templateId, title)}
+        templates={templateSelectOptions}
         selectedTemplateId={duplicateToTemplateId}
         onTemplateChange={setDuplicateToTemplateId}
         onClose={() => setDuplicatingSection(null)}
@@ -1954,7 +1971,7 @@ export default function TemplateEditor() {
       <DuplicateItemDialog
         open={Boolean(duplicatingItem || movingItem)}
         mode={movingItem ? "move" : "duplicate"}
-        templates={templateChoices(templateId, title)}
+        templates={templateSelectOptions}
         sections={commentDuplicateSections}
         selectedTemplateId={duplicateToTemplateId}
         selectedSectionId={duplicateItemSectionId}
@@ -1982,7 +1999,7 @@ export default function TemplateEditor() {
         open={duplicatingComments.length > 0 || movingComments.length > 0}
         mode={movingComments.length ? "move" : "duplicate"}
         count={movingComments.length || duplicatingComments.length}
-        templates={templateChoices(templateId, title)}
+        templates={templateSelectOptions}
         sections={commentDuplicateSections}
         items={commentDuplicateItems}
         selectedTemplateId={duplicateToTemplateId}
@@ -2022,13 +2039,55 @@ export default function TemplateEditor() {
   );
 }
 
-function PaneHeader({ children }: { children: string }) {
+function PaneHeader({
+  children,
+  onToggleCollapse,
+  collapseLabel,
+}: {
+  children: string;
+  onToggleCollapse?: () => void;
+  collapseLabel?: string;
+}) {
+  if (onToggleCollapse) {
+    return (
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        aria-label={collapseLabel ?? `Collapse ${children}`}
+        className="relative flex h-11 w-full shrink-0 cursor-pointer items-center justify-center border-b px-8 transition-colors hover:bg-muted/60"
+      >
+        <h2 className="text-sm font-medium tracking-[0.28em] text-muted-foreground uppercase">
+          {children}
+        </h2>
+        <span className="absolute right-1 flex size-7 items-center justify-center text-muted-foreground">
+          <ChevronLeft className="size-4" />
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <div className="flex h-11 shrink-0 items-center justify-center border-b">
+    <div className="relative flex h-11 shrink-0 items-center justify-center border-b px-8">
       <h2 className="text-sm font-medium tracking-[0.28em] text-muted-foreground uppercase">
         {children}
       </h2>
     </div>
+  );
+}
+
+function CollapsedPane({ label, onExpand }: { label: string; onExpand: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      aria-label={`Expand ${label}`}
+      className="flex h-full w-full flex-col items-center justify-center gap-3 py-4 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+    >
+      <ChevronRight className="size-4 shrink-0" />
+      <span className="text-sm font-medium tracking-[0.28em] uppercase [writing-mode:vertical-rl] rotate-180">
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -2207,11 +2266,15 @@ function ChoiceListEditor({
 }
 
 function CommentExpandedPanel({
+  templateId,
   comment,
   onChange,
+  onEnsureSaved,
 }: {
+  templateId?: string;
   comment: TemplateComment;
   onChange: (patch: Partial<TemplateComment>) => void;
+  onEnsureSaved?: () => Promise<void>;
 }) {
   const isMultiple = comment.answerFormat === "multiple";
   const isCheckbox = !comment.answerFormat || comment.answerFormat === "checkbox";
@@ -2219,6 +2282,114 @@ function CommentExpandedPanel({
   const isRange = comment.answerFormat === "numeric-range";
   const isUnit = isNumber || isRange;
   const isDefect = comment.type === "defect";
+  const photos = comment.defaultPhotos ?? [];
+
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<CommentDefaultPhoto | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<CommentDefaultPhoto | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoCaption, setPhotoCaption] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  const openAddPhoto = () => {
+    setEditingPhoto(null);
+    setPhotoFile(null);
+    setPhotoCaption("");
+    setPhotoError(null);
+    setPhotoDialogOpen(true);
+  };
+
+  const openEditPhoto = (photo: CommentDefaultPhoto) => {
+    setEditingPhoto(photo);
+    setPhotoFile(null);
+    setPhotoCaption(photo.imageCaption ?? "");
+    setPhotoError(null);
+    setPhotoDialogOpen(true);
+  };
+
+  const closePhotoDialog = () => {
+    if (photoBusy) return;
+    setPhotoDialogOpen(false);
+    setEditingPhoto(null);
+    setPhotoFile(null);
+    setPhotoCaption("");
+    setPhotoError(null);
+  };
+
+  const savePhotoDialog = async () => {
+    if (!templateId) {
+      setPhotoError("Save the template before adding photos.");
+      return;
+    }
+    setPhotoBusy(true);
+    setPhotoError(null);
+    try {
+      if (onEnsureSaved) {
+        await onEnsureSaved();
+      }
+      if (editingPhoto) {
+        const updated = await updateCommentImageCaption(
+          templateId,
+          editingPhoto.id,
+          photoCaption
+        );
+        onChange({
+          defaultPhotos: photos.map((photo) =>
+            photo.id === updated.id ? { ...photo, ...updated } : photo
+          ),
+        });
+      } else {
+        if (!photoFile) {
+          setPhotoError("Choose an image file.");
+          setPhotoBusy(false);
+          return;
+        }
+        const created = await uploadCommentImage(
+          templateId,
+          comment.id,
+          photoFile,
+          photoCaption
+        );
+        onChange({ defaultPhotos: [...photos, created] });
+      }
+      setPhotoDialogOpen(false);
+      setEditingPhoto(null);
+      setPhotoFile(null);
+      setPhotoCaption("");
+    } catch (error) {
+      const detail =
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        error.response &&
+        typeof error.response === "object" &&
+        "data" in error.response &&
+        error.response.data &&
+        typeof error.response.data === "object" &&
+        "detail" in error.response.data
+          ? String((error.response.data as { detail: unknown }).detail)
+          : null;
+      setPhotoError(
+        detail ||
+          (editingPhoto ? "Failed to update caption." : "Failed to upload image.")
+      );
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const removePhoto = async (photo: CommentDefaultPhoto) => {
+    if (!templateId) return;
+    try {
+      await deleteCommentImage(templateId, photo.id);
+      onChange({
+        defaultPhotos: photos.filter((row) => row.id !== photo.id),
+      });
+    } catch {
+      setPhotoError("Failed to delete image.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -2377,6 +2548,167 @@ function CommentExpandedPanel({
           className="min-h-[180px]"
         />
       </div>
+
+      <div className="flex flex-col gap-3">
+        {photos.length ? (
+          <>
+            <p className="text-sm text-muted-foreground">Default Photos</p>
+            <div className="flex flex-wrap gap-4">
+              {photos.map((photo) => (
+                <div key={photo.id} className="w-36">
+                  <div className="group relative overflow-hidden rounded-md border bg-muted/30">
+                    <button
+                      type="button"
+                      className="block w-full cursor-zoom-in"
+                      aria-label={`View ${photo.imageCaption || "default photo"} full size`}
+                      onClick={() => setPreviewPhoto(photo)}
+                    >
+                      <img
+                        src={resolveImageUrl(photo.imageUrl)}
+                        alt={photo.imageCaption || "Default photo"}
+                        className="aspect-[4/3] w-full object-cover"
+                      />
+                    </button>
+                    <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        className="rounded-md bg-white p-1.5 text-foreground shadow-lg ring-1 ring-black/10 hover:bg-white"
+                        aria-label="Edit caption"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEditPhoto(photo);
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md bg-white p-1.5 text-destructive shadow-lg ring-1 ring-black/10 hover:bg-white"
+                        aria-label="Delete photo"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void removePhoto(photo);
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {photo.imageCaption || "Untitled"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+        {photoError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {photoError}
+          </p>
+        ) : null}
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+            onClick={openAddPhoto}
+            disabled={!templateId}
+          >
+            <Camera />
+            ADD DEFAULT PHOTO
+          </Button>
+        </div>
+      </div>
+
+      <Dialog
+        open={photoDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closePhotoDialog();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center sm:text-center">
+            <DialogTitle className="text-foreground tracking-[0.18em] uppercase">
+              {editingPhoto ? "Edit Default Photo" : "Add a Default Photo"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {editingPhoto
+                ? "Update the caption for this default photo."
+                : "This photo will automatically be included for this comment in your reports."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            {!editingPhoto ? (
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
+                disabled={photoBusy}
+                className="text-foreground file:mr-3 file:rounded-md file:bg-muted file:px-3 file:py-1 file:text-foreground dark:bg-muted/40 dark:file:bg-background"
+              />
+            ) : (
+              <img
+                src={resolveImageUrl(editingPhoto.imageUrl)}
+                alt={editingPhoto.imageCaption || "Default photo"}
+                className="max-h-48 w-full rounded-md border border-border object-contain"
+              />
+            )}
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor={`photo-caption-${comment.id}`}
+                className="text-muted-foreground font-normal"
+              >
+                Caption
+              </Label>
+              <Input
+                id={`photo-caption-${comment.id}`}
+                value={photoCaption}
+                onChange={(event) => setPhotoCaption(event.target.value)}
+                placeholder="Caption"
+                disabled={photoBusy}
+              />
+            </div>
+            {photoError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {photoError}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="sm:justify-center">
+            <Button
+              type="button"
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={photoBusy || (!editingPhoto && !photoFile)}
+              onClick={() => void savePhotoDialog()}
+            >
+              {photoBusy ? "Saving..." : "SAVE"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(previewPhoto)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewPhoto(null);
+        }}
+      >
+        <DialogContent className="max-w-[min(96vw,56rem)] border-none bg-transparent p-0 shadow-none sm:max-w-[min(96vw,56rem)]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {previewPhoto?.imageCaption || "Default photo"}
+            </DialogTitle>
+            <DialogDescription>Full size photo preview</DialogDescription>
+          </DialogHeader>
+          {previewPhoto ? (
+            <img
+              src={resolveImageUrl(previewPhoto.imageUrl)}
+              alt={previewPhoto.imageCaption || "Default photo"}
+              className="max-h-[85vh] w-full rounded-lg object-contain shadow-2xl"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

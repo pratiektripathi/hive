@@ -1,7 +1,9 @@
 from fastapi import FastAPI
-from routers import user, token, apikey
+from fastapi.staticfiles import StaticFiles
+from routers import user, token, apikey, templates
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from image_storage import ensure_image_dir, IMAGE_DIR
 import os
 
 load_dotenv()
@@ -40,8 +42,12 @@ def root():
 def health():
     return {"ok": True}
 
+ensure_image_dir()
+app.mount("/images", StaticFiles(directory=str(IMAGE_DIR)), name="images")
+
 app.include_router(user.router, prefix="/api")
 app.include_router(user.signup_router, prefix="/api")
 app.include_router(token.router, prefix="/api")
 app.include_router(token.logout_router, prefix="/api")
 app.include_router(apikey.router, prefix="/api")
+app.include_router(templates.router, prefix="/api")

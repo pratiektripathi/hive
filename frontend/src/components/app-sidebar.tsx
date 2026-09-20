@@ -7,6 +7,7 @@ import {
   X,
   FileText,
   PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -135,8 +136,13 @@ export function AppSidebar() {
             <SidebarMenuButton
               onClick={toggleSidebar}
               className={`w-full ${state === "collapsed" ? "justify-center" : ""}`}
+              tooltip={state === "collapsed" ? "Expand" : "Collapse"}
             >
-              <PanelLeftClose className="h-4 w-4" />
+              {state === "collapsed" ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
               {state !== "collapsed" && <span>Collapse</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>

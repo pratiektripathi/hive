@@ -12,6 +12,7 @@ from enums import (
     DetectedTypeEnum,
     ImportMethodEnum,
     ImportStatusEnum,
+    RecommendationEnum,
     ThemeEnum,
     ValidationStatusEnum,
     WarningSeverityEnum,
@@ -89,8 +90,8 @@ class Template(UserOwned, table=True):
     __tablename__ = "templates"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str
-    source_system: str = Field(default="spectora")
+    name: str # template name
+    source_system: str = Field(default="")
     source_template_name: Optional[str] = None
     source_file_name: Optional[str] = None
     description: Optional[str] = None
@@ -143,6 +144,14 @@ class TemplateSection(UserOwned, table=True):
     sort_order: int
     source_ref: Optional[str] = None
     raw_html: Optional[str] = None
+    standards_of_practice: Optional[list[Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+    reminders: Optional[list[Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False, server_default=sa_text("now()")),
@@ -164,6 +173,10 @@ class TemplateItem(UserOwned, table=True):
     sort_order: int
     source_ref: Optional[str] = None
     raw_html: Optional[str] = None
+    reminders: Optional[list[Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False, server_default=sa_text("now()")),
@@ -188,6 +201,12 @@ class TemplateComment(UserOwned, table=True):
     type: Optional[CommentTypeEnum] = Field(default=None, sa_type=String)
     category: Optional[CommentCategoryEnum] = Field(default=None, sa_type=String)
     answer_type: Optional[AnswerTypeEnum] = Field(default=None, sa_type=String)
+    recommendation: Optional[RecommendationEnum] = Field(default=None, sa_type=String)
+    default_checked: bool = Field(default=False)
+    default_text: Optional[list[Any]] = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
     default_value: Optional[str] = None
     default_value2: Optional[str] = None
     default_unit: Optional[str] = None
@@ -197,6 +216,29 @@ class TemplateComment(UserOwned, table=True):
     default_estimation_max: Optional[float] = None
     default_location: Optional[str] = None
     pos: int
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=sa_text("now()")),
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=sa_text("now()")),
+    )
+
+
+class TemplateCommentImage(UserOwned, table=True):
+    __tablename__ = "template_comment_images"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    template_comment_id: UUID = Field(
+        foreign_key="template_comments.id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    image_url: str = Field(unique=True, index=True)
+    import_image_url: Optional[str] = None
+    image_caption: Optional[str] = None
+    sort_order: int = Field(default=0)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False, server_default=sa_text("now()")),
