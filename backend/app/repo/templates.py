@@ -82,6 +82,24 @@ def _enum_value(value: Any) -> Optional[str]:
     return value.value if hasattr(value, "value") else str(value)
 
 
+def _default_text_has_link(value: Any) -> bool:
+    if not isinstance(value, list):
+        return False
+
+    def walk(nodes: list[Any]) -> bool:
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            if node.get("type") == "a" and node.get("url"):
+                return True
+            children = node.get("children")
+            if isinstance(children, list) and walk(children):
+                return True
+        return False
+
+    return walk(value)
+
+
 def image_to_api(image: TemplateCommentImage) -> dict[str, Any]:
     filename = str(image.image_url or "")
     is_import_placeholder = filename.startswith("import:")
@@ -107,6 +125,22 @@ def comment_to_api(
 ) -> dict[str, Any]:
     answer = _enum_value(comment.answer_type)
     category = _normalize_category(_enum_value(comment.category))
+    default_text = comment.default_text
+    # Rebuild from HTML when missing, or when stored JSON has no links but HTML does.
+    # Prefer rich_text_html (rich HTML column), then text (HTML text column).
+    source_html = comment.rich_text_html or comment.text
+    needs_rebuild = not default_text
+    if (
+        not needs_rebuild
+        and source_html
+        and "<a" in source_html.lower()
+        and not _default_text_has_link(default_text)
+    ):
+        needs_rebuild = True
+    if needs_rebuild and source_html:
+        from imports.apply import comment_html_to_default_text
+
+        default_text = comment_html_to_default_text(source_html)
     return {
         "id": str(comment.id),
         "name": comment.name or "",
@@ -120,7 +154,7 @@ def comment_to_api(
         "defaultValue": comment.default_value,
         "defaultValue2": comment.default_value2,
         "defaultLocation": comment.default_location,
-        "defaultText": comment.default_text,
+        "defaultText": default_text,
         "defaultPhotos": [image_to_api(image) for image in (images or [])],
     }
 

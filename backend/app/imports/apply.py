@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import html
+import re
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
@@ -156,6 +159,211 @@ def _parse_int(value: Optional[str], default: int) -> int:
         return int(float(str(value).strip()))
     except ValueError:
         return default
+
+
+class _CommentHtmlToPlate(HTMLParser):
+    """
+    Convert Spectora comment HTML into Plate/Slate JSON.
+    Preserves paragraphs and hyperlinks (<a href>).
+    """
+
+    BLOCK_TAGS = {"p", "div", "li", "h1", "h2", "h3", "tr", "blockquote"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.blocks: list[dict[str, Any]] = []
+        self._children: list[dict[str, Any]] = []
+        self._text_buf = ""
+        self._link_stack: list[dict[str, Any]] = []
+        self._marks: dict[str, bool] = {}
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        if tag in {"script", "style"}:
+            self._skip_depth += 1
+            return
+        if self._skip_depth:
+            return
+
+        if tag in self.BLOCK_TAGS:
+            self._flush_text()
+            self._flush_block()
+            return
+
+        if tag == "br":
+            self._text_buf += "\n"
+            return
+
+        if tag == "a":
+            self._flush_text()
+            href = ""
+            for key, value in attrs:
+                if key.lower() == "href" and value:
+                    href = value.strip()
+                    break
+            self._link_stack.append({"type": "a", "url": href, "children": []})
+            return
+
+        if tag in {"strong", "b"}:
+            self._flush_text()
+            self._marks["bold"] = True
+        elif tag in {"em", "i"}:
+            self._flush_text()
+            self._marks["italic"] = True
+        elif tag == "u":
+            self._flush_text()
+            self._marks["underline"] = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style"} and self._skip_depth:
+            self._skip_depth -= 1
+            return
+        if self._skip_depth:
+            return
+
+        if tag in self.BLOCK_TAGS:
+            self._flush_text()
+            self._flush_block()
+            return
+
+        if tag == "a":
+            self._flush_text()
+            if self._link_stack:
+                link = self._link_stack.pop()
+                if not link["children"]:
+                    link["children"] = [{"text": link.get("url") or ""}]
+                self._append_inline(link)
+            return
+
+        if tag in {"strong", "b"}:
+            self._flush_text()
+            self._marks.pop("bold", None)
+        elif tag in {"em", "i"}:
+            self._flush_text()
+            self._marks.pop("italic", None)
+        elif tag == "u":
+            self._flush_text()
+            self._marks.pop("underline", None)
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
+        text = data.replace("\xa0", " ")
+        if text:
+            self._text_buf += text
+
+    def _leaf(self, text: str) -> dict[str, Any]:
+        node: dict[str, Any] = {"text": text}
+        for mark, enabled in self._marks.items():
+            if enabled:
+                node[mark] = True
+        return node
+
+    def _append_inline(self, node: dict[str, Any]) -> None:
+        if self._link_stack:
+            self._link_stack[-1]["children"].append(node)
+        else:
+            self._children.append(node)
+
+    def _flush_text(self) -> None:
+        if not self._text_buf:
+            return
+        text = self._text_buf
+        self._text_buf = ""
+        # Collapse whitespace except intentional newlines from <br>
+        parts = text.split("\n")
+        for index, part in enumerate(parts):
+            cleaned = re.sub(r"[ \t]+", " ", part)
+            if cleaned:
+                self._append_inline(self._leaf(cleaned))
+            if index < len(parts) - 1:
+                self._append_inline(self._leaf("\n"))
+
+    def _normalize_children(self, children: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not children:
+            return [{"text": ""}]
+        # Trim leading/trailing pure-whitespace text leaves, keep links intact.
+        normalized: list[dict[str, Any]] = []
+        for node in children:
+            if "text" in node and "type" not in node:
+                text = node["text"]
+                if not normalized and not text.strip():
+                    continue
+                normalized.append(node)
+            else:
+                normalized.append(node)
+        while (
+            normalized
+            and "text" in normalized[-1]
+            and "type" not in normalized[-1]
+            and not str(normalized[-1].get("text", "")).strip()
+        ):
+            normalized.pop()
+        if not normalized:
+            return [{"text": ""}]
+        # Slate expects text leaves around inlines in some editors; ensure edges are text.
+        if "type" in normalized[0]:
+            normalized.insert(0, {"text": ""})
+        if "type" in normalized[-1]:
+            normalized.append({"text": ""})
+        return normalized
+
+    def _flush_block(self) -> None:
+        children = self._normalize_children(self._children)
+        self._children = []
+        # Skip empty paragraphs
+        only_empty = all(
+            ("text" in child and "type" not in child and not str(child.get("text", "")).strip())
+            for child in children
+        )
+        if only_empty:
+            return
+        self.blocks.append({"type": "p", "children": children})
+
+    def result(self) -> list[dict[str, Any]]:
+        self._flush_text()
+        self._flush_block()
+        return self.blocks
+
+
+def comment_html_to_default_text(value: Optional[str]) -> Optional[list[dict[str, Any]]]:
+    """
+    Convert Spectora Comment Text (HTML or plain) into Plate JSON for defaultText.
+    Preserves hyperlinks as { type: 'a', url, children }.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    looks_like_html = "<" in raw and ">" in raw
+    if looks_like_html:
+        parser = _CommentHtmlToPlate()
+        try:
+            parser.feed(raw)
+            parser.close()
+            blocks = parser.result()
+        except Exception:
+            blocks = []
+        if blocks:
+            return blocks
+        stripped = re.sub(r"<[^>]+>", " ", raw)
+        stripped = html.unescape(stripped)
+        stripped = re.sub(r"\s+", " ", stripped).strip()
+        if not stripped:
+            return None
+        return [{"type": "p", "children": [{"text": stripped}]}]
+
+    paragraphs = [
+        part.strip()
+        for part in re.split(r"\n{2,}|\r\n{2,}", raw)
+        if part.strip()
+    ]
+    if not paragraphs:
+        return None
+    return [
+        {"type": "p", "children": [{"text": paragraph}]}
+        for paragraph in paragraphs
+    ]
 
 
 def _invert_mappings(
@@ -377,6 +585,12 @@ async def apply_import(
             answer_type = AnswerTypeEnum.multiple
 
         comment_id = uuid4()
+        # Spectora Comment Text is HTML (may include <a> links).
+        # text            -> source HTML text
+        # rich_text_html  -> same rich HTML (links preserved)
+        # default_text    -> Plate JSON converted from that HTML (editor rendering)
+        source_html = (comment_text or "").strip() or None
+        default_text = comment_html_to_default_text(source_html)
         comment = TemplateComment(
             id=comment_id,
             user_id=user_id,
@@ -384,11 +598,14 @@ async def apply_import(
             section_id=section.id,
             item_id=item.id,
             name=comment_name,
-            text=comment_text,
+            text=source_html,
+            rich_text_html=source_html,
+            raw_html=source_html,
             type=comment_type,
             category=category,
             answer_type=answer_type,
             recommendation=recommendation,
+            default_text=default_text,
             default_value=_row_value(row, field_to_source, "default_value"),
             default_value2=_row_value(row, field_to_source, "default_value2"),
             default_unit=_row_value(row, field_to_source, "default_unit"),
