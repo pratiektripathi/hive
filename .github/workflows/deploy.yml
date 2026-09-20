@@ -17,7 +17,7 @@ jobs:
     runs-on: [self-hosted, linux, hive-vps]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Sync checkout to app path
         run: |
@@ -41,6 +41,16 @@ jobs:
 
       - name: Public HTTPS smoke tests
         run: |
-          curl -fsS -o /dev/null -w "frontend %{http_code}\n" https://hive.100xseller.com/
-          curl -fsS https://hiveapi.100xseller.com/health
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null -w "frontend %{http_code}\n" https://hive.100xseller.com/ \
+              && curl -fsS https://hiveapi.100xseller.com/health; then
+              echo
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Public HTTPS smoke tests failed after retries" >&2
+          curl -sS -D - -o /dev/null https://hive.100xseller.com/ || true
+          curl -sS https://hiveapi.100xseller.com/health || true
           echo
+          exit 1
