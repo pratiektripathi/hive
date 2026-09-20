@@ -1,0 +1,30 @@
+http:
+  routers:
+    hive-template-frontend:
+      rule: Host(`hive.100xseller.com`)
+      entryPoints:
+        - websecure
+      service: hive-template-frontend
+      tls:
+        certResolver: letsencrypt
+
+    hive-template-backend:
+      rule: Host(`hiveapi.100xseller.com`)
+      entryPoints:
+        - websecure
+      service: hive-template-backend
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    hive-template-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://hive-template-frontend:80"
+        passHostHeader: true
+
+    hive-template-backend:
+      loadBalancer:
+        servers:
+          - url: "http://hive-template-backend:8000"
+        passHostHeader: true

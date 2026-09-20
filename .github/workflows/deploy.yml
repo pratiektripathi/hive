@@ -1,0 +1,108 @@
+name: Deploy Hive to VPS
+
+# GitHub-hosted runners cannot reach WireGuard 10.0.0.1.
+# Default SSH target is the public IP of the same VPS (hive.100xseller.com).
+# Override with secret VPS_HOST if needed.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: hive-vps-deploy
+  cancel-in-progress: false
+
+env:
+  APP_PATH: /opt/hive-template-importer
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve VPS host
+        id: host
+        env:
+          HOST_SECRET: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -n "$HOST_SECRET" ]; then
+            echo "host=$HOST_SECRET" >> "$GITHUB_OUTPUT"
+          else
+            echo "host=31.97.237.164" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          VPS_HOST: ${{ steps.host.outputs.host }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          PORT="${VPS_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          echo "SSH_PORT=$PORT" >> "$GITHUB_ENV"
+          if [ -n "$SSH_KEY" ]; then
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+          else
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y sshpass
+            printf '%s\n' "$SSH_PASSWORD" > ~/.ssh/pass
+            chmod 600 ~/.ssh/pass
+          fi
+
+      - name: Sync source to VPS
+        env:
+          VPS_HOST: ${{ steps.host.outputs.host }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          USERNAME="${VPS_USER:-root}"
+          SSH_BASE=(ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes)
+          if [ -z "$SSH_KEY" ]; then
+            SSH_BASE=(sshpass -f "$HOME/.ssh/pass" ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes)
+          fi
+          "${SSH_BASE[@]}" "${USERNAME}@${VPS_HOST}" "mkdir -p '${APP_PATH}'"
+          RSYNC_RSH="${SSH_BASE[*]}"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.vps' \
+            --exclude '.env' \
+            --exclude 'frontend/node_modules/' \
+            --exclude 'frontend/dist/' \
+            --exclude '__pycache__/' \
+            --exclude '.venv/' \
+            --filter 'P .env' \
+            -e "$RSYNC_RSH" \
+            ./ "${USERNAME}@${VPS_HOST}:${APP_PATH}/"
+
+      - name: Rebuild stack and verify
+        env:
+          VPS_HOST: ${{ steps.host.outputs.host }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          USERNAME="${VPS_USER:-root}"
+          SSH_BASE=(ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes)
+          if [ -z "$SSH_KEY" ]; then
+            SSH_BASE=(sshpass -f "$HOME/.ssh/pass" ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes)
+          fi
+          "${SSH_BASE[@]}" "${USERNAME}@${VPS_HOST}" \
+            "chmod +x '${APP_PATH}/scripts/remote-deploy.sh'"
+          "${SSH_BASE[@]}" "${USERNAME}@${VPS_HOST}" \
+            env POSTGRES_PASSWORD="$POSTGRES_PASSWORD" SECRET_KEY="$SECRET_KEY" APP_PATH="$APP_PATH" \
+            bash "${APP_PATH}/scripts/remote-deploy.sh"
+
+      - name: Public HTTPS smoke tests
+        run: |
+          curl -fsS -o /dev/null -w "frontend %{http_code}\n" https://hive.100xseller.com/
+          curl -fsS https://hiveapi.100xseller.com/health
+          echo
