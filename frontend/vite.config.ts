@@ -14,7 +14,16 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      cn: path.resolve(__dirname, "./node_modules/@udecode/cn"),
     },
+  },
+  optimizeDeps: {
+    include: [
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-label",
+      "@radix-ui/react-separator",
+    ],
   },
 
   server: {

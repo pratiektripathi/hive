@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from routers import user, token, apikey
-from database import create_db
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -23,11 +22,6 @@ app=FastAPI(
     version="1.2.0",
     description="Hive API"
 )
-
-# Create database tables on startup
-@app.on_event("startup")
-async def startup_event():
-    await create_db()
 
 app.add_middleware(
     CORSMiddleware,

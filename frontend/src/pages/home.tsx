@@ -1,17 +1,20 @@
+import { Home as HomeIcon } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 export default function Home() {
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Home Dashboard</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              Welcome to Temoter
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background pb-8">
+      <header className="flex items-center gap-2 px-2 py-1">
+        <HomeIcon className="size-5" />
+        <h1 className="text-xl font-normal leading-none">Home Dashboard</h1>
+        <span className="text-gray-300 dark:text-gray-600 leading-none" aria-hidden>
+          |
+        </span>
+        <p className="text-sm text-gray-600 dark:text-gray-400 leading-none">
+          Welcome to Temoter
+        </p>
+      </header>
+      <Separator />
     </div>
-  )
+  );
 }

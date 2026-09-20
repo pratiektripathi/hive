@@ -20,6 +20,16 @@ function App() {
                 <Layout />
               </ProtectedRoute>
             } />
+            <Route path="/templates" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            } />
+            <Route path="/templates/:templateId" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            } />
           </Routes>
         </BrowserRouter>
       </ThemeProvider>

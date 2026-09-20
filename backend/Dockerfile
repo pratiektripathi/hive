@@ -10,16 +10,17 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY app/ .
+COPY alembic.ini .
+COPY alembic ./alembic
+COPY app ./app
+COPY entrypoint.sh ./entrypoint.sh
 
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN sed -i 's/\r$//' /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh && \
+    useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
 
-CMD ["gunicorn", "main:app", \
-     "--workers", "1", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "120", \
-     "--keep-alive", "5"]
+ENTRYPOINT ["/app/entrypoint.sh"]

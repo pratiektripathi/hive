@@ -1,5 +1,3 @@
-from sqlmodel import SQLModel
-from sqlalchemy import text
 # Use compatibility module to avoid direct SQLAlchemy imports
 # SQLModel is built on SQLAlchemy, so we use this wrapper
 try:
@@ -17,6 +15,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
 
+DATABASE_URL = DATABASE_URL.strip().strip('"').strip("'")
+
 # Compose may pass psycopg; this app uses asyncpg
 for prefix in ("postgresql+psycopg://", "postgresql+psycopg2://", "postgresql://"):
     if DATABASE_URL.startswith(prefix):
@@ -26,21 +26,6 @@ for prefix in ("postgresql+psycopg://", "postgresql+psycopg2://", "postgresql://
 engine = create_async_engine(DATABASE_URL, echo=True)
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-async def create_db():
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
-            for stmt in (
-                'ALTER TABLE "user" DROP COLUMN IF EXISTS role',
-                'ALTER TABLE "user" DROP COLUMN IF EXISTS department',
-                'ALTER TABLE "user" DROP COLUMN IF EXISTS super_user',
-            ):
-                await conn.execute(text(stmt))
-    except Exception as exc:
-        # Two workers can race on CREATE TYPE; ignore if objects already exist.
-        message = str(exc).lower()
-        if "already exists" not in message:
-            raise
 
 async def get_session():
     async with async_session_maker() as session:

@@ -17,6 +17,19 @@ open http://localhost:8094
 - Independent template copy.
 - Seed templates loaded from `resources/spectora-exports/`.
 
+## Database migrations
+
+Schema changes go through Alembic. Production applies `alembic upgrade head` when the backend container starts.
+
+```bash
+cd backend
+alembic upgrade head
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head
+```
+
+`DATABASE_URL` must be set. Local Alembic loads `backend/app/.env`; Compose sets it for the backend service.
+
 ## Deployment
 
 Production stack on VPS 1 (`10.0.0.1`) behind Traefik:

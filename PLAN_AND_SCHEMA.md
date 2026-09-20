@@ -18,6 +18,7 @@
    - Save screenshots to `resources/screenshots/` and exports to `resources/spectora-exports/`.
 2. Database/schema implementation
    - Create normalized model for templates, sections, items, comments, raw rows, import warnings, and AI mapping runs.
+   - Scope every tenant-owned row with `user_id` so one user cannot access another user's data.
 3. Backend implementation
    - FastAPI API for imports, template tree retrieval, editing, copying, warnings, seed templates.
    - Parser importer primary; AI-assisted importer secondary with validation and honest failure.
@@ -35,8 +36,29 @@
 
 ## Schema
 
+Every tenant-owned table stores `user_id` FK `user(id)`. API reads/writes must filter by the authenticated user so one account cannot see or change another user's data.
+
+### user
+- id int PK
+- firstname text not null
+- lastname text not null
+- username text not null unique
+- password text not null
+- phone text
+- theme enum: light | dark default light
+- isEnable boolean default true
+- created_by int nullable FK user(id)
+- created_at timestamptz
+
+### apikey
+- id int PK
+- user_id int NOT NULL FK user(id) on delete cascade
+- key text not null unique
+- created_at timestamptz
+
 ### templates
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - name text not null
 - source_system text default 'spectora'
 - source_template_name text
@@ -50,6 +72,7 @@
 
 ### template_imports
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - template_id UUID FK templates(id) on delete cascade
 - source_file_name text not null
 - source_file_hash text not null
@@ -63,22 +86,14 @@
 - raw_metadata jsonb default '{}'
 - created_at timestamptz
 
-
-### icons
-- id UUID PK
-- name text not null
-- icon_svg text         # SVG or raw icon data
-- description text
-- created_at timestamptz
-- updated_at timestamptz
-
 ### template_sections
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - template_id UUID FK templates(id) on delete cascade
 - parent_section_id UUID nullable FK template_sections(id)
 - title text not null
 - description text
-- icon_id UUID FK icons(id)                # references icons table
+- icon text
 - sort_order int not null
 - source_ref text
 - raw_html text
@@ -87,6 +102,7 @@
 
 ### template_items
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - template_id UUID FK templates(id) on delete cascade
 - section_id UUID FK template_sections(id) on delete cascade
 - title text not null
@@ -98,8 +114,8 @@
 - updated_at timestamptz
 
 ### template_comments
-
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - template_id UUID NOT NULL FK templates(id) on delete cascade
 - section_id UUID FK template_sections(id) on delete cascade
 - item_id UUID FK template_items(id) on delete cascade
@@ -119,16 +135,12 @@
 - default_estimation_max number
 - default_location text
 - pos int not null                   # order within item
-- owner UUID FK users(id)            # owner user id
 - created_at timestamptz
 - updated_at timestamptz
 
-
-
-
-
 ### import_warnings
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - import_id UUID FK template_imports(id) on delete cascade
 - template_id UUID FK templates(id) on delete cascade
 - severity text: info | warning | error
@@ -141,6 +153,7 @@
 
 ### template_raw_rows
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - import_id UUID FK template_imports(id) on delete cascade
 - template_id UUID FK templates(id) on delete cascade
 - row_number int not null
@@ -152,6 +165,7 @@
 
 ### ai_import_runs
 - id UUID PK
+- user_id int NOT NULL FK user(id) on delete cascade
 - import_id UUID FK template_imports(id) on delete cascade
 - model_name text
 - prompt_version text
@@ -182,5 +196,6 @@
 - Import AI path either works or shows validated/unavailable status honestly.
 - Edit/save persists after refresh.
 - Copy is independent from original.
+- A user cannot read or write another user's templates or related rows.
 - Invalid upload shows error/warnings without crash.
 - Container restart preserves data.
