@@ -1,5 +1,4 @@
 import {
-  Home,
   User2,
   LucidePower,
   Sun,
@@ -8,10 +7,17 @@ import {
   FileText,
   PanelLeftClose,
   PanelLeftOpen,
+  Sparkles,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOnboardingTour } from "@/contexts/OnboardingTourContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import {
+  gettingStartedRemainingMs,
+  isGettingStartedVisible,
+} from "@/lib/onboarding";
 
 import {
   Sidebar,
@@ -39,18 +45,15 @@ interface MenuItem {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   path: string;
+  tourId?: string;
 }
 
 const items: MenuItem[] = [
   {
-    title: "Home",
-    icon: Home,
-    path: "/home",
-  },
-  {
     title: "My Templates",
     icon: FileText,
     path: "/templates",
+    tourId: "nav-templates",
   },
 ];
 
@@ -60,6 +63,25 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { setOpenMobile, state, toggleSidebar } = useSidebar();
+  const { startTour } = useOnboardingTour();
+  const [showGettingStarted, setShowGettingStarted] = useState(
+    isGettingStartedVisible()
+  );
+
+  useEffect(() => {
+    const refresh = () => setShowGettingStarted(isGettingStartedVisible());
+    refresh();
+
+    const remaining = gettingStartedRemainingMs();
+    if (remaining <= 0) return;
+
+    const timer = window.setTimeout(refresh, remaining + 50);
+    const interval = window.setInterval(refresh, 5_000);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+    };
+  }, [user?.id]);
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -119,6 +141,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     isActive={isActive(item.path)}
                     onClick={() => handleNavigation(item.path)}
+                    data-tour={item.tourId}
                   >
                     <item.icon />
                     <span>{item.title}</span>
@@ -132,11 +155,25 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
+          {showGettingStarted && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => startTour()}
+                className={`w-full ${state === "collapsed" ? "justify-center" : ""}`}
+                tooltip="Getting Started"
+                data-tour="getting-started"
+              >
+                <Sparkles className="h-4 w-4" />
+                {state !== "collapsed" && <span>Getting Started</span>}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={toggleSidebar}
               className={`w-full ${state === "collapsed" ? "justify-center" : ""}`}
               tooltip={state === "collapsed" ? "Expand" : "Collapse"}
+              data-tour="sidebar-collapse"
             >
               {state === "collapsed" ? (
                 <PanelLeftOpen className="h-4 w-4" />

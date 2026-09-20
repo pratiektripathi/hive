@@ -79,7 +79,7 @@ export function Signup() {
       });
 
       if (success) {
-        navigate("/home");
+        navigate("/templates");
       } else {
         setError("Signup failed. Please try again.");
       }

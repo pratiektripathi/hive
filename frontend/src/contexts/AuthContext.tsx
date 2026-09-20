@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 import api from '@/lib/axios';
+import { markGettingStartedWindow } from '@/lib/onboarding';
 
 interface User {
   id: string;
@@ -129,7 +130,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
 
         if (response.data.access_token) {
-          return await establishSession(response.data.access_token, username);
+          const ok = await establishSession(response.data.access_token, username);
+          if (ok) markGettingStartedWindow();
+          return ok;
         }
         return false;
       }
@@ -151,7 +154,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (response.data.access_token) {
-        return await establishSession(response.data.access_token, data.username);
+        const ok = await establishSession(response.data.access_token, data.username);
+        if (ok) markGettingStartedWindow();
+        return ok;
       }
       return false;
     } catch (error) {

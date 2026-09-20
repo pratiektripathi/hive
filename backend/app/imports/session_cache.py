@@ -18,6 +18,7 @@ class ImportSession:
     user_id: int
     parsed: ParsedSpreadsheet
     created_at: float = field(default_factory=time.time)
+    ai_suggest: Optional[dict[str, Any]] = None
 
 
 class ImportSessionStore:
@@ -48,6 +49,17 @@ class ImportSessionStore:
             session = self._sessions.get(session_id)
             if not session or session.user_id != user_id:
                 return None
+            return session
+
+    def set_ai_suggest(
+        self, session_id: str, user_id: int, payload: dict[str, Any]
+    ) -> Optional[ImportSession]:
+        with self._lock:
+            self._purge_expired()
+            session = self._sessions.get(session_id)
+            if not session or session.user_id != user_id:
+                return None
+            session.ai_suggest = payload
             return session
 
     def pop(self, session_id: str, user_id: int) -> Optional[ImportSession]:

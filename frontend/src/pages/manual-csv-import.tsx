@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
   applyImport,
+  aiSuggestMappings,
   listImportFields,
   listRecommendationOptions,
   parseImportFile,
@@ -37,8 +38,13 @@ import {
   type RecommendationMapping,
 } from "@/lib/imports";
 import { RECOMMENDATIONS } from "@/lib/templates";
+import {
+  TOUR_STEP,
+  useOnboardingTour,
+} from "@/contexts/OnboardingTourContext";
 
 type WizardStep = "upload" | "parse" | "map" | "configure" | "complete";
+type ImportWizardMode = "manual" | "ai";
 
 const STEPS: { id: WizardStep; label: string }[] = [
   { id: "upload", label: "Upload" },
@@ -88,15 +94,24 @@ function groupFields(fields: ImportField[]) {
   return Array.from(groups.entries());
 }
 
-export default function ManualCsvImport() {
+export default function ManualCsvImport({
+  mode = "manual",
+}: {
+  mode?: ImportWizardMode;
+}) {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAiMode = mode === "ai";
+  const { run: tourRunning, stepIndex: tourStepIndex, advanceStep } =
+    useOnboardingTour();
 
   const [step, setStep] = useState<WizardStep>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [owned, setOwned] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiBanner, setAiBanner] = useState<string | null>(null);
+  const [aiUsed, setAiUsed] = useState(false);
   const [fields, setFields] = useState<ImportField[]>([]);
   const [recommendationOptions, setRecommendationOptions] = useState<string[]>([
     ...RECOMMENDATIONS,
@@ -171,17 +186,24 @@ export default function ManualCsvImport() {
 
   const canContinueUpload = Boolean(file) && owned;
 
-  const acceptFile = useCallback((next: File | null) => {
-    if (!next) return;
-    const lower = next.name.toLowerCase();
-    if (!/\.(csv|tsv|xlsx|xls)$/.test(lower)) {
-      setError("Please select a CSV or Excel file (.csv, .xlsx, .xls).");
-      return;
-    }
-    setError(null);
-    setFile(next);
-    setTemplateName(defaultNameFromFile(next.name));
-  }, []);
+  const acceptFile = useCallback(
+    (next: File | null) => {
+      if (!next) return;
+      const lower = next.name.toLowerCase();
+      if (!/\.(csv|tsv|xlsx|xls)$/.test(lower)) {
+        setError("Please select a CSV or Excel file (.csv, .xlsx, .xls).");
+        return;
+      }
+      setError(null);
+      setFile(next);
+      setTemplateName(defaultNameFromFile(next.name));
+
+      if (tourRunning && tourStepIndex === TOUR_STEP.IMPORT_UPLOAD) {
+        advanceStep();
+      }
+    },
+    [tourRunning, tourStepIndex, advanceStep]
+  );
 
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -193,13 +215,42 @@ export default function ManualCsvImport() {
   const runParse = async () => {
     if (!file) return;
     setError(null);
+    setAiBanner(null);
+    setAiUsed(false);
     setStep("parse");
     try {
       const result = await parseImportFile(file);
+      let mappings = result.suggestedMappings;
+      let recommendationMappings = result.suggestedRecommendationMappings || [];
+
+      if (isAiMode) {
+        try {
+          const ai = await aiSuggestMappings(result.importSessionId);
+          mappings = ai.suggestedMappings;
+          recommendationMappings = ai.suggestedRecommendationMappings || [];
+          setAiUsed(Boolean(ai.usedAi));
+          if (ai.usedAi) {
+            setAiBanner(
+              ai.reasoningSummary ||
+                "Mappings suggested by AI — review and continue."
+            );
+          } else {
+            setAiBanner(
+              ai.reasoningSummary ||
+                "AI unavailable — using automatic heuristics. Review mappings before importing."
+            );
+          }
+        } catch {
+          setAiBanner(
+            "AI suggest failed — using automatic heuristics. Review mappings before importing."
+          );
+        }
+      }
+
       setParsed(result);
       setTemplateName(defaultNameFromFile(result.sourceFileName));
       setMappingRows(
-        result.suggestedMappings
+        mappings
           .filter((mapping) => mapping.mapsTo && mapping.mapsTo !== "skip")
           .map((mapping, index) => ({
             id: `${index}-${mapping.sourceColumn}`,
@@ -209,7 +260,7 @@ export default function ManualCsvImport() {
           }))
       );
       setRecommendationRows(
-        (result.suggestedRecommendationMappings || []).map((mapping, index) => ({
+        recommendationMappings.map((mapping, index) => ({
           id: `rec-${index}-${mapping.sourceValue}`,
           sourceValue: mapping.sourceValue,
           mapsTo: mapping.mapsTo,
@@ -284,6 +335,7 @@ export default function ManualCsvImport() {
         recommendationMappings,
         templateName: name,
         description: description.trim() || undefined,
+        importMethod: isAiMode ? (aiUsed ? "ai" : "hybrid") : "parser",
       });
       setResultTemplateId(result.templateId);
       setResultCounts({
@@ -323,7 +375,9 @@ export default function ManualCsvImport() {
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-36">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="size-5 shrink-0" />
-            <h1 className="text-xl font-normal leading-none">Manual CSV Import</h1>
+            <h1 className="text-xl font-normal leading-none">
+              {isAiMode ? "AI-Powered Import" : "Manual CSV Import"}
+            </h1>
           </div>
         </div>
       </header>
@@ -331,9 +385,16 @@ export default function ManualCsvImport() {
 
       <div className="mx-auto mt-5 w-full max-w-5xl px-3">
         <p className="mb-4 text-sm text-muted-foreground">
-          Upload your CSV or Excel file and map each column to a template field.
+          {isAiMode
+            ? "Upload your CSV or Excel file. AI suggests column mappings on the server — review them, then import."
+            : "Upload your CSV or Excel file and map each column to a template field."}
         </p>
 
+        {aiBanner ? (
+          <div className="mb-4 rounded-md border border-violet-300 bg-violet-50 px-3 py-2 text-sm text-violet-900 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-100">
+            {aiBanner}
+          </div>
+        ) : null}
         <div className="mb-6 rounded-lg border bg-card p-4">
           <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
             <span>Import Progress</span>
@@ -378,6 +439,7 @@ export default function ManualCsvImport() {
                 ? "border-primary bg-primary/5"
                 : "border-muted-foreground/25"
             )}
+            data-tour="import-upload"
             onDragOver={(event) => {
               event.preventDefault();
               setDragging(true);
@@ -414,10 +476,23 @@ export default function ManualCsvImport() {
             )}
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
+          <label
+            className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30"
+            data-tour="import-confirm"
+          >
             <Checkbox
               checked={owned}
-              onCheckedChange={(value) => setOwned(value === true)}
+              onCheckedChange={(value) => {
+                const next = value === true;
+                setOwned(next);
+                if (
+                  next &&
+                  tourRunning &&
+                  tourStepIndex === TOUR_STEP.IMPORT_CONFIRM
+                ) {
+                  advanceStep();
+                }
+              }}
               className="mt-0.5"
             />
             <span>
@@ -433,6 +508,7 @@ export default function ManualCsvImport() {
               type="button"
               disabled={!canContinueUpload}
               onClick={runParse}
+              data-tour="import-continue"
             >
               Continue to Mapping
               <ArrowRight className="ml-1.5 size-4" />
@@ -675,7 +751,11 @@ export default function ManualCsvImport() {
             <Button type="button" variant="outline" onClick={() => setStep("upload")}>
               Back
             </Button>
-            <Button type="button" onClick={() => setStep("configure")}>
+            <Button
+              type="button"
+              onClick={() => setStep("configure")}
+              data-tour="import-continue-map"
+            >
               Continue
               <ArrowRight className="ml-1.5 size-4" />
             </Button>
@@ -741,6 +821,7 @@ export default function ManualCsvImport() {
               type="button"
               disabled={applying || !templateName.trim()}
               onClick={runApply}
+              data-tour="import-create"
             >
               {applying ? (
                 <>
@@ -799,6 +880,7 @@ export default function ManualCsvImport() {
                   state: { name: templateName },
                 })
               }
+              data-tour="import-open"
             >
               Open template
             </Button>

@@ -34,6 +34,18 @@ export type ParseImportResult = {
   suggestedRecommendationMappings: RecommendationMapping[];
 };
 
+export type AiSuggestResult = {
+  importSessionId: string;
+  suggestedMappings: ColumnMapping[];
+  suggestedRecommendationMappings: RecommendationMapping[];
+  sectionIconHints: Record<string, string>;
+  status: string;
+  modelName: string | null;
+  promptVersion?: string;
+  reasoningSummary?: string;
+  usedAi: boolean;
+};
+
 export type ApplyImportResult = {
   templateId: string;
   templateName: string;
@@ -84,12 +96,24 @@ export async function parseImportFile(file: File): Promise<ParseImportResult> {
   return response.data;
 }
 
+export async function aiSuggestMappings(
+  importSessionId: string
+): Promise<AiSuggestResult> {
+  const response = await api.post<AiSuggestResult>(
+    "/imports/ai-suggest",
+    { importSessionId },
+    { timeout: 120000 }
+  );
+  return response.data;
+}
+
 export async function applyImport(payload: {
   importSessionId: string;
   mappings: ColumnMapping[];
   recommendationMappings?: RecommendationMapping[];
   templateName: string;
   description?: string;
+  importMethod?: "parser" | "ai" | "hybrid";
 }): Promise<ApplyImportResult> {
   const response = await api.post<ApplyImportResult>("/imports/apply", payload, {
     timeout: 300000,

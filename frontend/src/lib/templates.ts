@@ -227,3 +227,60 @@ export async function deleteCommentImage(
 ): Promise<void> {
   await api.delete(`/templates/${templateId}/images/${imageId}`);
 }
+
+export type CommentAiAssistResult = {
+  name: string | null;
+  choices: string | null;
+  defaultText: string | null;
+  category: DefectCategory | null;
+  recommendation: string | null;
+  status: string;
+  modelName: string | null;
+  promptVersion?: string;
+  message: string | null;
+};
+
+export async function assistCommentWithAi(payload: {
+  mode: "generate" | "edit";
+  sectionTitle?: string;
+  itemTitle?: string;
+  commentType: CommentType;
+  answerFormat: string;
+  name?: string;
+  choices?: string;
+  defaultText?: string;
+  category?: DefectCategory | null;
+  recommendation?: string;
+}): Promise<CommentAiAssistResult> {
+  const response = await api.post<CommentAiAssistResult>(
+    "/templates/ai/comment",
+    payload,
+    { timeout: 120000 }
+  );
+  return response.data;
+}
+
+export type TemplateExportFormat = "json" | "csv" | "xlsx";
+
+export async function exportTemplate(
+  templateId: string,
+  format: TemplateExportFormat
+): Promise<Blob> {
+  const response = await api.get<Blob>(`/templates/${templateId}/export`, {
+    params: { format },
+    responseType: "blob",
+    timeout: 120000,
+  });
+  return response.data;
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

@@ -15,17 +15,18 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginRoute />} />
             <Route path="/signup" element={<SignupRoute />} />
-            <Route path="/home" element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            } />
+            <Route path="/home" element={<Navigate to="/templates" replace />} />
             <Route path="/templates" element={
               <ProtectedRoute>
                 <Layout />
               </ProtectedRoute>
             } />
             <Route path="/templates/import/manual" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            } />
+            <Route path="/templates/import/ai" element={
               <ProtectedRoute>
                 <Layout />
               </ProtectedRoute>

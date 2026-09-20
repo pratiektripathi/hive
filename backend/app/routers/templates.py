@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 from database import get_session
 from image_storage import save_upload
+from imports.ai_comment import assist_comment
+from imports.export import export_template
 from model import ShowUser
 from routers.user import show_user_me
 from repo import templates as templates_repo
@@ -93,6 +95,19 @@ class CommentImageCaptionUpdate(BaseModel):
     imageCaption: str = ""
 
 
+class CommentAiAssistRequest(BaseModel):
+    mode: str = "generate"
+    sectionTitle: str = ""
+    itemTitle: str = ""
+    commentType: str = "info"
+    answerFormat: str = "checkbox"
+    name: str = ""
+    choices: str = ""
+    defaultText: str = ""
+    category: Optional[str] = None
+    recommendation: str = ""
+
+
 @router.get("/", response_model=List[TemplateListItem])
 async def list_templates(
     currentuser: Annotated[ShowUser, Depends(show_user_me)],
@@ -108,6 +123,37 @@ async def create_template(
     session: AsyncSession = Depends(get_session),
 ):
     return await templates_repo.create_template(currentuser.id, payload.name, session)
+
+
+@router.post("/ai/comment")
+async def comment_ai_assist(
+    payload: CommentAiAssistRequest,
+    currentuser: Annotated[ShowUser, Depends(show_user_me)],
+):
+    """AI comment assist — OpenAI credentials stay on the server only."""
+    _ = currentuser
+    return assist_comment(
+        mode=payload.mode,
+        section_title=payload.sectionTitle,
+        item_title=payload.itemTitle,
+        comment_type=payload.commentType,
+        answer_format=payload.answerFormat,
+        name=payload.name,
+        choices=payload.choices,
+        default_text=payload.defaultText,
+        category=payload.category,
+        recommendation=payload.recommendation,
+    )
+
+
+@router.get("/{template_id}/export")
+async def export_template_file(
+    template_id: UUID,
+    currentuser: Annotated[ShowUser, Depends(show_user_me)],
+    session: AsyncSession = Depends(get_session),
+    format: str = "json",
+):
+    return await export_template(template_id, currentuser.id, format, session)
 
 
 @router.get("/{template_id}", response_model=TemplateDetail)

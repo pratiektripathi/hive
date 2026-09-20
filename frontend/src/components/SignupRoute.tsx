@@ -6,7 +6,7 @@ export function SignupRoute() {
   const { isAuthenticated } = useAuth();
 
   if (isAuthenticated) {
-    return <Navigate to="/home" replace />;
+    return <Navigate to="/templates" replace />;
   }
 
   return <Signup />;

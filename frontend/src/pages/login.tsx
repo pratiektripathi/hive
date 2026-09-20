@@ -55,8 +55,7 @@ export function Login() {
       const success = await login(username.trim(), password);
 
       if (success) {
-        // Redirect to home page after successful login
-        navigate("/home");
+        navigate("/templates");
       } else {
         setError("Invalid username or password. Please check your credentials and try again.");
       }

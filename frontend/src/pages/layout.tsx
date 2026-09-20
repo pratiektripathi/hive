@@ -2,9 +2,10 @@ import { Component, Suspense, lazy, useEffect, useRef, type ReactNode } from "re
 import { Menu } from "lucide-react"
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour"
 import { Button } from "@/components/ui/button"
-import Home from "./home"
-import { useLocation } from "react-router-dom"
+import { OnboardingTourProvider } from "@/contexts/OnboardingTourContext"
+import { Navigate, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 
 function SidebarRouteSync({ collapse }: { collapse: boolean }) {
@@ -94,32 +95,35 @@ export default function Layout() {
     if (isTemplatesList) return <MyTemplates />;
     if (isManualImport) return <ManualCsvImport />;
     if (isTemplateEditor) return <TemplateEditor />;
-    return <Home />;
+    return <Navigate to="/templates" replace />;
   };
 
   return (
     <SidebarProvider>
-      <SidebarRouteSync collapse={collapseSidebar} />
-      <AppSidebar/>
-      <main className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-background dark:text-white">
-        <div
-          className={cn(
-            "min-h-0 flex-1 bg-background",
-            isTemplateEditor ? "overflow-hidden" : "overflow-auto"
-          )}
-        >
-          <PageErrorBoundary key={location.pathname}>
-            <Suspense
-              fallback={
-                <div className="px-6 py-10 text-sm text-muted-foreground">Loading...</div>
-              }
-            >
-              {renderContent()}
-            </Suspense>
-          </PageErrorBoundary>
-        </div>
-      </main>
-      <MobileMenuToggle />
+      <OnboardingTourProvider>
+        <SidebarRouteSync collapse={collapseSidebar} />
+        <AppSidebar />
+        <main className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-background dark:text-white">
+          <div
+            className={cn(
+              "min-h-0 flex-1 bg-background",
+              isTemplateEditor ? "overflow-hidden" : "overflow-auto"
+            )}
+          >
+            <PageErrorBoundary key={location.pathname}>
+              <Suspense
+                fallback={
+                  <div className="px-6 py-10 text-sm text-muted-foreground">Loading...</div>
+                }
+              >
+                {renderContent()}
+              </Suspense>
+            </PageErrorBoundary>
+          </div>
+        </main>
+        <MobileMenuToggle />
+        <OnboardingTour />
+      </OnboardingTourProvider>
     </SidebarProvider>
   )
 }

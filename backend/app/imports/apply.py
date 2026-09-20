@@ -19,12 +19,14 @@ from enums import (
     ImportMethodEnum,
     ImportStatusEnum,
     RecommendationEnum,
+    ValidationStatusEnum,
     WarningSeverityEnum,
 )
 from imports.mapping import FIELD_KEYS, PHOTO_SLOT_COUNT, suggest_section_icon
 from imports.parser import ParsedSpreadsheet
 from image_storage import download_image_from_url
 from model import (
+    AiImportRun,
     ImportWarning,
     Template,
     TemplateComment,
@@ -213,9 +215,13 @@ async def apply_import(
     description: Optional[str],
     session: AsyncSession,
     recommendation_mappings: Optional[list[dict[str, Any]]] = None,
+    import_method: ImportMethodEnum = ImportMethodEnum.parser,
+    section_icon_hints: Optional[dict[str, str]] = None,
+    ai_run: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     field_to_source, mapping_warnings = _invert_mappings(mappings)
     recommendation_value_map = _build_recommendation_value_map(recommendation_mappings)
+    icon_hints = section_icon_hints or {}
 
     if "section_name" not in field_to_source and "item_name" not in field_to_source:
         raise HTTPException(
@@ -239,7 +245,7 @@ async def apply_import(
         source_template_name=name,
         source_file_name=parsed.source_file_name,
         description=(description or "").strip() or None,
-        import_method=ImportMethodEnum.parser,
+        import_method=import_method,
         is_seed=False,
         created_at=now,
         updated_at=now,
@@ -291,7 +297,7 @@ async def apply_import(
                 user_id=user_id,
                 template_id=template_id,
                 title=section_title,
-                icon=suggest_section_icon(section_title),
+                icon=icon_hints.get(section_title) or suggest_section_icon(section_title),
                 sort_order=section_order,
                 source_ref=f"row:{row_index}",
                 created_at=now,
@@ -493,7 +499,7 @@ async def apply_import(
         template_id=template_id,
         source_file_name=parsed.source_file_name,
         source_file_hash=parsed.source_file_hash,
-        import_method=ImportMethodEnum.parser,
+        import_method=import_method,
         status=status_value,
         total_rows=len(parsed.rows),
         imported_sections=len(sections_by_title),
@@ -504,16 +510,50 @@ async def apply_import(
             "headers": parsed.headers,
             "mappings": mappings,
             "recommendationMappings": recommendation_mappings or [],
+            "sectionIconHints": icon_hints,
             "stats": parsed.stats,
         },
         created_at=now,
     )
+
+    ai_import_run: Optional[AiImportRun] = None
+    if import_method in (ImportMethodEnum.ai, ImportMethodEnum.hybrid) and ai_run:
+        validation_raw = str(ai_run.get("status") or ValidationStatusEnum.unavailable.value)
+        try:
+            validation_status = ValidationStatusEnum(validation_raw)
+        except ValueError:
+            validation_status = ValidationStatusEnum.unavailable
+        ai_import_run = AiImportRun(
+            id=uuid4(),
+            user_id=user_id,
+            import_id=import_id,
+            model_name=ai_run.get("modelName"),
+            prompt_version=ai_run.get("promptVersion"),
+            input_summary={
+                "sourceFileName": parsed.source_file_name,
+                "headers": parsed.headers,
+                "stats": parsed.stats,
+                "reasoningSummary": ai_run.get("reasoningSummary"),
+            },
+            output_json={
+                "columnMappings": mappings,
+                "recommendationMappings": recommendation_mappings or [],
+                "sectionIconHints": icon_hints,
+                "usedAi": ai_run.get("usedAi"),
+            },
+            validation_status=validation_status,
+            validation_errors=list(ai_run.get("validationErrors") or []),
+            created_at=now,
+        )
 
     # Insert in FK order so parents exist before children.
     session.add(template)
     await session.flush()
     session.add(import_row)
     await session.flush()
+    if ai_import_run is not None:
+        session.add(ai_import_run)
+        await session.flush()
     if sections:
         session.add_all(sections)
         await session.flush()

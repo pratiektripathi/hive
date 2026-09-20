@@ -167,6 +167,11 @@ export function CreateTemplateDialog({
                   className={cn("mt-5 w-full", option.buttonClass)}
                   disabled={busy}
                   onClick={() => onSelect(option.mode)}
+                  data-tour={
+                    option.mode === "manual-import"
+                      ? "create-mode-manual"
+                      : undefined
+                  }
                 >
                   <ButtonIcon />
                   {busy && option.mode === "scratch"

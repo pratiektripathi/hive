@@ -144,8 +144,9 @@ export default function MyTemplates() {
       return;
     }
 
-    if (mode !== "scratch") {
-      setError("Import options are coming soon. Use Start Building to create from scratch.");
+    if (mode === "ai-import") {
+      setCreateDialogOpen(false);
+      navigate("/templates/import/ai");
       return;
     }
 
@@ -289,6 +290,7 @@ export default function MyTemplates() {
               setCreateDialogOpen(true);
             }}
             className="h-10 dark:font-bold"
+            data-tour="create-template"
           >
             <Plus />
             Create Template

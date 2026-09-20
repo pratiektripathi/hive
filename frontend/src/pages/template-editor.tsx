@@ -22,6 +22,7 @@ import {
   Building2,
   Calendar,
   Car,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleMinus,
@@ -30,6 +31,7 @@ import {
   CookingPot,
   Copy,
   Cylinder,
+  Download,
   Droplets,
   Fence,
   FileText,
@@ -39,6 +41,7 @@ import {
   LampDesk,
   Layers,
   Leaf,
+  Loader2,
   PanelTop,
   Pencil,
   PenLine,
@@ -82,6 +85,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -99,7 +108,10 @@ import {
 import { cn } from "@/lib/utils";
 import {
   RECOMMENDATIONS,
+  assistCommentWithAi,
   deleteCommentImage,
+  downloadBlob,
+  exportTemplate,
   getTemplate,
   listTemplates,
   resolveImageUrl,
@@ -110,6 +122,7 @@ import {
   type CommentType,
   type DefectCategory,
   type TemplateComment,
+  type TemplateExportFormat,
   type TemplateItem,
   type TemplateRow,
   type TemplateSection,
@@ -117,6 +130,34 @@ import {
 
 const EMPTY_SOP: RichTextValue = [{ type: "p", children: [{ text: "" }] }];
 
+function richTextFromPlain(text: string | null | undefined): RichTextValue {
+  const raw = (text || "").trim();
+  if (!raw) return EMPTY_SOP;
+  const paragraphs = raw.split(/\n{2,}|\r\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (!paragraphs.length) return EMPTY_SOP;
+  return paragraphs.map((paragraph) => ({
+    type: "p",
+    children: [{ text: paragraph.replace(/\n/g, " ") }],
+  }));
+}
+
+function plainFromRichText(value: RichTextValue | undefined | null): string {
+  if (!value || !Array.isArray(value)) return "";
+  const parts: string[] = [];
+  const walk = (nodes: unknown[]) => {
+    for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      const record = node as { text?: string; children?: unknown[]; type?: string };
+      if (typeof record.text === "string" && record.text) parts.push(record.text);
+      if (Array.isArray(record.children)) walk(record.children);
+      if (record.type === "p" || record.type === "h1" || record.type === "h2") {
+        parts.push("\n");
+      }
+    }
+  };
+  walk(value);
+  return parts.join("").replace(/\n{3,}/g, "\n\n").trim();
+}
 const SECTION_ICONS = [
   { id: "none", label: "No Icon", Icon: CircleOff },
   { id: "report", label: "Report", Icon: FileText },
@@ -584,6 +625,24 @@ export default function TemplateEditor() {
   const commentInputRef = useRef<HTMLInputElement>(null);
   const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
   const [itemsCollapsed, setItemsCollapsed] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExport = async (format: TemplateExportFormat) => {
+    if (!templateId || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await exportTemplate(templateId, format);
+      const safeName = (title || "template").replace(/[^\w.\- ]+/g, "").trim() || "template";
+      const extension = format === "xlsx" ? "xlsx" : format;
+      downloadBlob(blob, `${safeName}.${extension}`);
+    } catch {
+      setExportError("Export failed. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const startRowDrag = (kind: DragKind, id: string, event: DragEvent) => {
     if ((event.target as HTMLElement).closest("[data-no-drag]")) {
@@ -1505,6 +1564,40 @@ export default function TemplateEditor() {
             )}
           </div>
         </div>
+        <div className="relative z-10 ml-auto flex items-center gap-2">
+          {exportError ? (
+            <span className="hidden text-xs text-destructive sm:inline">{exportError}</span>
+          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8"
+                disabled={!templateId || exporting}
+              >
+                {exporting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                Export
+                <ChevronDown className="size-4 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => void handleExport("json")}>
+                Export JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleExport("xlsx")}>
+                Export Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleExport("csv")}>
+                Export CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
       <Separator />
 
@@ -1521,6 +1614,7 @@ export default function TemplateEditor() {
           {sectionsCollapsed ? (
             <CollapsedPane
               label="Sections"
+              tourId="collapse-sections"
               onExpand={() => setSectionsCollapsed(false)}
             />
           ) : (
@@ -1528,6 +1622,7 @@ export default function TemplateEditor() {
               <PaneHeader
                 onToggleCollapse={() => setSectionsCollapsed(true)}
                 collapseLabel="Collapse sections"
+                tourId="collapse-sections"
               >
                 Sections
               </PaneHeader>
@@ -1615,12 +1710,17 @@ export default function TemplateEditor() {
 
         <section className="flex min-h-0 min-w-0 flex-col border-r">
           {itemsCollapsed ? (
-            <CollapsedPane label="Items" onExpand={() => setItemsCollapsed(false)} />
+            <CollapsedPane
+              label="Items"
+              tourId="collapse-items"
+              onExpand={() => setItemsCollapsed(false)}
+            />
           ) : (
             <>
               <PaneHeader
                 onToggleCollapse={() => setItemsCollapsed(true)}
                 collapseLabel="Collapse items"
+                tourId="collapse-items"
               >
                 Items
               </PaneHeader>
@@ -1921,6 +2021,8 @@ export default function TemplateEditor() {
                                 >
                                   <CommentExpandedPanel
                                     templateId={templateId}
+                                    sectionTitle={selectedSection?.title || ""}
+                                    itemTitle={selectedItem?.title || ""}
                                     comment={comment}
                                     onChange={(patch) => updateComment(comment.id, patch)}
                                     onEnsureSaved={async () => {
@@ -1991,6 +2093,8 @@ export default function TemplateEditor() {
       />
       <AddCommentDialog
         draft={commentEditor}
+        sectionTitle={selectedSection?.title || ""}
+        itemTitle={selectedItem?.title || ""}
         onDraftChange={setCommentEditor}
         onClose={() => setCommentEditor(null)}
         onSave={saveCommentEditor}
@@ -2043,10 +2147,12 @@ function PaneHeader({
   children,
   onToggleCollapse,
   collapseLabel,
+  tourId,
 }: {
   children: string;
   onToggleCollapse?: () => void;
   collapseLabel?: string;
+  tourId?: string;
 }) {
   if (onToggleCollapse) {
     return (
@@ -2054,6 +2160,7 @@ function PaneHeader({
         type="button"
         onClick={onToggleCollapse}
         aria-label={collapseLabel ?? `Collapse ${children}`}
+        data-tour={tourId}
         className="relative flex h-11 w-full shrink-0 cursor-pointer items-center justify-center border-b px-8 transition-colors hover:bg-muted/60"
       >
         <h2 className="text-sm font-medium tracking-[0.28em] text-muted-foreground uppercase">
@@ -2075,12 +2182,21 @@ function PaneHeader({
   );
 }
 
-function CollapsedPane({ label, onExpand }: { label: string; onExpand: () => void }) {
+function CollapsedPane({
+  label,
+  onExpand,
+  tourId,
+}: {
+  label: string;
+  onExpand: () => void;
+  tourId?: string;
+}) {
   return (
     <button
       type="button"
       onClick={onExpand}
       aria-label={`Expand ${label}`}
+      data-tour={tourId}
       className="flex h-full w-full flex-col items-center justify-center gap-3 py-4 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
     >
       <ChevronRight className="size-4 shrink-0" />
@@ -2267,11 +2383,15 @@ function ChoiceListEditor({
 
 function CommentExpandedPanel({
   templateId,
+  sectionTitle = "",
+  itemTitle = "",
   comment,
   onChange,
   onEnsureSaved,
 }: {
   templateId?: string;
+  sectionTitle?: string;
+  itemTitle?: string;
   comment: TemplateComment;
   onChange: (patch: Partial<TemplateComment>) => void;
   onEnsureSaved?: () => Promise<void>;
@@ -2291,6 +2411,52 @@ function CommentExpandedPanel({
   const [photoCaption, setPhotoCaption] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const runEditWithAi = async () => {
+    if (aiBusy) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const choices =
+        isMultiple
+          ? comment.answerChoices || ""
+          : isUnit
+            ? comment.unitChoices || ""
+            : "";
+      const result = await assistCommentWithAi({
+        mode: "edit",
+        sectionTitle,
+        itemTitle,
+        commentType: comment.type,
+        answerFormat: comment.answerFormat || "checkbox",
+        name: comment.name,
+        choices,
+        defaultText: plainFromRichText(comment.defaultText),
+        category: comment.category,
+        recommendation: comment.recommendation || "",
+      });
+      if (result.status === "unavailable" || result.status === "rejected") {
+        setAiError(result.message || "AI is unavailable right now.");
+        return;
+      }
+      const patch: Partial<TemplateComment> = {};
+      if (result.name) patch.name = result.name;
+      if (result.defaultText) patch.defaultText = richTextFromPlain(result.defaultText);
+      if (isMultiple && result.choices != null) patch.answerChoices = result.choices;
+      if (isUnit && result.choices != null) patch.unitChoices = result.choices;
+      if (isDefect) {
+        if (result.category) patch.category = result.category;
+        if (result.recommendation) patch.recommendation = result.recommendation;
+      }
+      onChange(patch);
+    } catch {
+      setAiError("AI edit failed. Please try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const openAddPhoto = () => {
     setEditingPhoto(null);
@@ -2394,13 +2560,18 @@ function CommentExpandedPanel({
   return (
     <div className="flex flex-col gap-6">
       {isMultiple || isCheckbox ? (
-        <Button
-          type="button"
-          className="w-fit bg-green-700 text-white hover:bg-green-800"
-        >
-          <Wand2 />
-          Edit using AI
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            className="w-fit bg-green-700 text-white hover:bg-green-800"
+            disabled={aiBusy}
+            onClick={() => void runEditWithAi()}
+          >
+            {aiBusy ? <Loader2 className="animate-spin" /> : <Wand2 />}
+            Edit using AI
+          </Button>
+          {aiError ? <p className="text-sm text-destructive">{aiError}</p> : null}
+        </div>
       ) : null}
       {isCheckbox ? (
         <label className="flex w-fit items-center gap-2 text-sm">
@@ -3172,17 +3343,66 @@ function EditItemDialog({
 
 function AddCommentDialog({
   draft,
+  sectionTitle = "",
+  itemTitle = "",
   onDraftChange,
   onClose,
   onSave,
 }: {
   draft: CommentEditorDraft | null;
+  sectionTitle?: string;
+  itemTitle?: string;
   onDraftChange: (draft: CommentEditorDraft) => void;
   onClose: () => void;
   onSave: () => void;
 }) {
   const isDefect = draft?.type === "defect";
   const answerFormats = isDefect ? DEFECT_ANSWER_FORMATS : ANSWER_FORMATS;
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const runGenerateWithAi = async () => {
+    if (!draft || aiBusy) return;
+    if (!draft.name.trim()) {
+      onDraftChange({ ...draft, nameError: true });
+      return;
+    }
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const result = await assistCommentWithAi({
+        mode: "generate",
+        sectionTitle,
+        itemTitle,
+        commentType: draft.type,
+        answerFormat: draft.answerFormat,
+        name: draft.name.trim(),
+        choices: draft.choices,
+        defaultText: plainFromRichText(draft.defaultText),
+        category: draft.category,
+        recommendation: draft.recommendation,
+      });
+      if (result.status === "unavailable" || result.status === "rejected") {
+        setAiError(result.message || "AI is unavailable right now.");
+        return;
+      }
+      onDraftChange({
+        ...draft,
+        name: result.name || draft.name,
+        choices: result.choices ?? draft.choices,
+        defaultText: result.defaultText
+          ? richTextFromPlain(result.defaultText)
+          : draft.defaultText,
+        category: (result.category as DefectCategory) || draft.category,
+        recommendation: result.recommendation || draft.recommendation,
+        nameError: false,
+      });
+    } catch {
+      setAiError("AI generate failed. Please try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   return (
     <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && onClose()}>
@@ -3219,18 +3439,20 @@ function AddCommentDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <Button
-                type="button"
-                className="shrink-0 bg-green-700 text-white hover:bg-green-800"
-                onClick={() => {
-                  if (!draft.name.trim()) {
-                    onDraftChange({ ...draft, nameError: true });
-                  }
-                }}
-              >
-                <Wand2 />
-                Generate using AI
-              </Button>
+              <div className="flex shrink-0 flex-col gap-1">
+                <Button
+                  type="button"
+                  className="shrink-0 bg-green-700 text-white hover:bg-green-800"
+                  disabled={aiBusy}
+                  onClick={() => void runGenerateWithAi()}
+                >
+                  {aiBusy ? <Loader2 className="animate-spin" /> : <Wand2 />}
+                  Generate using AI
+                </Button>
+                {aiError ? (
+                  <p className="max-w-[220px] text-xs text-destructive">{aiError}</p>
+                ) : null}
+              </div>
             </div>
             {draft.answerFormat === "multiple" ||
             (!isDefect &&
