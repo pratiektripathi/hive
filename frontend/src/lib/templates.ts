@@ -167,11 +167,18 @@ export async function copyTemplate(
   return response.data;
 }
 
-export function resolveImageUrl(path: string | undefined | null): string {
-  if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return path;
+export function resolveImageUrl(
+  path: string | undefined | null,
+  importImageUrl?: string | null
+): string {
+  const candidate =
+    path && !path.startsWith("import:")
+      ? path
+      : importImageUrl || path || "";
+  if (!candidate || candidate.startsWith("import:")) return "";
+  if (/^https?:\/\//i.test(candidate)) return candidate;
   const origin = conf.baseURL.replace(/\/api\/?$/, "");
-  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${origin}${candidate.startsWith("/") ? candidate : `/${candidate}`}`;
 }
 
 export async function uploadCommentImage(

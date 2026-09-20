@@ -83,10 +83,18 @@ def _enum_value(value: Any) -> Optional[str]:
 
 
 def image_to_api(image: TemplateCommentImage) -> dict[str, Any]:
-    filename = image.image_url
+    filename = str(image.image_url or "")
+    is_import_placeholder = filename.startswith("import:")
+    if is_import_placeholder:
+        # Prefer the remote/source URL so the editor can display imported photos.
+        image_url = image.import_image_url or ""
+    elif filename.startswith("/") or filename.startswith("http"):
+        image_url = filename
+    else:
+        image_url = f"/images/{filename}"
     return {
         "id": str(image.id),
-        "imageUrl": f"/images/{filename}" if not str(filename).startswith("/") else str(filename),
+        "imageUrl": image_url,
         "importImageUrl": image.import_image_url,
         "imageCaption": image.image_caption or "",
         "sortOrder": image.sort_order,

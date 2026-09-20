@@ -138,8 +138,12 @@ export default function MyTemplates() {
   }, [query, sortKey, templates]);
 
   const handleCreateSelect = async (mode: CreateTemplateMode) => {
-    // Only "Create from Scratch" / Start Building creates a template for now.
-    // AI and manual import will get their own flows later.
+    if (mode === "manual-import") {
+      setCreateDialogOpen(false);
+      navigate("/templates/import/manual");
+      return;
+    }
+
     if (mode !== "scratch") {
       setError("Import options are coming soon. Use Start Building to create from scratch.");
       return;

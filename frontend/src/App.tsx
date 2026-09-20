@@ -25,6 +25,11 @@ function App() {
                 <Layout />
               </ProtectedRoute>
             } />
+            <Route path="/templates/import/manual" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            } />
             <Route path="/templates/:templateId" element={
               <ProtectedRoute>
                 <Layout />

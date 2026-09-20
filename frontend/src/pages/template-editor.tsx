@@ -2564,7 +2564,7 @@ function CommentExpandedPanel({
                       onClick={() => setPreviewPhoto(photo)}
                     >
                       <img
-                        src={resolveImageUrl(photo.imageUrl)}
+                        src={resolveImageUrl(photo.imageUrl, photo.importImageUrl)}
                         alt={photo.imageCaption || "Default photo"}
                         className="aspect-[4/3] w-full object-cover"
                       />
@@ -2648,7 +2648,7 @@ function CommentExpandedPanel({
               />
             ) : (
               <img
-                src={resolveImageUrl(editingPhoto.imageUrl)}
+                src={resolveImageUrl(editingPhoto.imageUrl, editingPhoto.importImageUrl)}
                 alt={editingPhoto.imageCaption || "Default photo"}
                 className="max-h-48 w-full rounded-md border border-border object-contain"
               />
@@ -2702,7 +2702,7 @@ function CommentExpandedPanel({
           </DialogHeader>
           {previewPhoto ? (
             <img
-              src={resolveImageUrl(previewPhoto.imageUrl)}
+              src={resolveImageUrl(previewPhoto.imageUrl, previewPhoto.importImageUrl)}
               alt={previewPhoto.imageCaption || "Default photo"}
               className="max-h-[85vh] w-full rounded-lg object-contain shadow-2xl"
             />

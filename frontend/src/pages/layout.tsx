@@ -57,6 +57,7 @@ function MobileMenuToggle() {
 
 const MyTemplates = lazy(() => import("./my-templates"))
 const TemplateEditor = lazy(() => import("./template-editor"))
+const ManualCsvImport = lazy(() => import("./manual-csv-import"))
 
 class PageErrorBoundary extends Component<
   { children: ReactNode },
@@ -84,17 +85,21 @@ export default function Layout() {
   const location = useLocation();
 
   const isTemplatesList = location.pathname === "/templates";
-  const isTemplateEditor = location.pathname.startsWith("/templates/");
+  const isManualImport = location.pathname === "/templates/import/manual";
+  const isTemplateEditor =
+    location.pathname.startsWith("/templates/") && !isManualImport;
+  const collapseSidebar = isTemplateEditor || isManualImport;
 
   const renderContent = () => {
     if (isTemplatesList) return <MyTemplates />;
+    if (isManualImport) return <ManualCsvImport />;
     if (isTemplateEditor) return <TemplateEditor />;
     return <Home />;
   };
 
   return (
     <SidebarProvider>
-      <SidebarRouteSync collapse={isTemplateEditor} />
+      <SidebarRouteSync collapse={collapseSidebar} />
       <AppSidebar/>
       <main className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-background dark:text-white">
         <div
